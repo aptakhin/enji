@@ -1,8 +1,8 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include "common.h"
+
+namespace enji {
 
 struct ServerOptions {
     String host;
@@ -31,6 +31,7 @@ private:
 class Response {
 public:
     friend class UvRequest;
+    friend class HttpRequestHandler;
 
     Response() {}
     Response(String&& buf) : buf_(buf) {}
@@ -84,5 +85,67 @@ class IRequestHandler {
 public:
     virtual void handle(ConnectionContext context) = 0;
 
+    virtual const Request& request() const = 0;
+
     virtual ~IRequestHandler() {}
 };
+
+class UvProc {
+public:
+    UvProc(uv_stream_t* server);
+    UvProc(uv_stream_t* server, uv_loop_t* loop);
+
+    uv_loop_t* loop() const { return ~loop_; }
+
+    uv_stream_t* server() const { return server_; }
+
+    void run();
+
+protected:
+    ScopePtrExit<uv_loop_t> loop_;
+    uv_stream_t* server_;
+};
+
+class UvRequest {
+public:
+    UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc);
+    uv_stream_t* tcp() const { return stream_.get(); }
+
+    void accept();
+
+    void on_after_read(ssize_t nread, const uv_buf_t* buf);
+
+    void on_after_write(uv_write_t* req, int status);
+
+protected:
+    Server::Handler* parent_;
+    IRequestHandler* handler_;
+
+    std::unique_ptr<uv_stream_t> stream_;
+    const UvProc* proc_;
+
+    std::stringstream input_;
+    std::stringstream output_;
+    ConnectionContext ctx_;
+};
+
+class Server::Handler {
+public:
+    Handler(Server* parent, uv_tcp_t* server);
+
+    void run();
+
+    void on_connection(int status);
+    Response find_route(const String& url, IRequestHandler* handler);
+
+    UvProc& proc() { return proc_; }
+
+protected:
+    Server* parent_;
+
+    UvProc proc_;
+
+    std::vector<std::shared_ptr<UvRequest>> requests_;
+};
+
+} // namespace enji

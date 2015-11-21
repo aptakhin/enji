@@ -9,22 +9,25 @@
 
 #include <uv.h>
 
+namespace enji {
+
 typedef std::string String;
 
-template <typename Resource>
+template<typename Resource>
 class ScopeExit {
 public:
-    typedef std::function<void (Resource*)> Deleter;
+    typedef std::function<void(Resource *)> Deleter;
 
-    ScopeExit() {}
-    ScopeExit(Resource&& resource, Deleter&& deleter)
-        :   on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) {}
+    ScopeExit() { }
 
-    void reset(Resource&& resource, Deleter&& deleter) {
+    ScopeExit(Resource &&resource, Deleter &&deleter)
+        : on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) { }
+
+    void reset(Resource &&resource, Deleter &&deleter) {
         on_ = std::unique_ptr<Resource, Deleter>(std::forward<Resource>(resource), std::forward<Deleter>(deleter));
     }
 
-    Resource* operator ~() {
+    Resource *operator~() {
         return on_.get();
     }
 
@@ -32,20 +35,21 @@ private:
     std::unique_ptr<Resource, Deleter> on_;
 };
 
-template <typename Resource>
+template<typename Resource>
 class ScopePtrExit {
 public:
-    typedef std::function<void (Resource*)> Deleter;
+    typedef std::function<void(Resource *)> Deleter;
 
-    ScopePtrExit() {}
-    ScopePtrExit(Resource* resource, Deleter&& deleter)
-        :   on_(resource, std::forward<Deleter>(deleter)) {}
+    ScopePtrExit() { }
 
-    void reset(Resource* resource, Deleter&& deleter) {
+    ScopePtrExit(Resource *resource, Deleter &&deleter)
+        : on_(resource, std::forward<Deleter>(deleter)) { }
+
+    void reset(Resource *resource, Deleter &&deleter) {
         on_ = std::unique_ptr<Resource, Deleter>(resource, std::forward<Deleter>(deleter));
     }
 
-    Resource* operator ~() const {
+    Resource *operator~() const {
         return on_.get();
     }
 
@@ -56,28 +60,28 @@ private:
 
 class Thread {
 public:
-    typedef std::function<void (void)> Func;
+    typedef std::function<void(void)> Func;
 
-    friend void run_thread(void* arg);
+    friend void run_thread(void *arg);
 
-    void run(Func&& thread_func);
+    void run(Func &&thread_func);
 
 protected:
     uv_thread_t thread_;
     Func func_;
 };
 
-template <typename T>
+template<typename T>
 class SafeQueue {
 public:
-    void push(T&& value) {
+    void push(T &&value) {
         std::lock_guard<std::mutex> guard(mutex_);
         queue_.emplace(value);
     }
 
     T pop() {
         std::lock_guard<std::mutex> guard(mutex_);
-        T&& top = queue_.front();
+        T &&top = queue_.front();
         queue_.pop();
         return top;
     }
@@ -94,48 +98,47 @@ private:
 
 class IInputStream {
 public:
-    virtual size_t read(char* data, size_t bytes) = 0;
+    virtual size_t read(char *data, size_t bytes) = 0;
 
     virtual void close() = 0;
 
-    virtual ~IInputStream() {}
+    virtual ~IInputStream() { }
 };
 
 class IOutputStream {
 public:
-    virtual void write(const char* data, size_t bytes) = 0;
+    virtual void write(const char *data, size_t bytes) = 0;
 
     virtual void close() = 0;
 
-    virtual ~IOutputStream() {}
+    virtual ~IOutputStream() { }
 };
 
 class StdInputStream : public IInputStream {
 public:
-    StdInputStream(std::stringstream& in);
+    StdInputStream(std::stringstream &in);
 
-    size_t read(char* data, size_t bytes) override;
+    size_t read(char *data, size_t bytes) override;
 
     bool eof() const { return in_.eof(); }
 
     void close() override;
 
 private:
-    std::stringstream& in_;
+    std::stringstream &in_;
 };
 
 class StdOutputStream : public IOutputStream {
 public:
-    StdOutputStream(std::stringstream& out);
+    StdOutputStream(std::stringstream &out);
 
-    void write(const char* data, size_t bytes) override;
+    void write(const char *data, size_t bytes) override;
 
     void close() override;
 
 private:
-    std::stringstream& out_;
+    std::stringstream &out_;
 };
-
 
 
 class IoBuffer {
@@ -157,17 +160,21 @@ typedef struct {
 
 class UvOutputStream : public IOutputStream {
 public:
-    UvOutputStream(uv_stream_t* stream, void (*cb_after_write)(uv_write_t*, int), void (*cb_close)(uv_handle_t* handle));
+    UvOutputStream(uv_stream_t *stream, void (*cb_after_write)(uv_write_t *, int),
+                   void (*cb_close)(uv_handle_t *handle));
 
-    void write(const char* data, size_t bytes) override;
+    void write(const char *data, size_t bytes) override;
 
     void close() override;
 
 private:
-    uv_stream_t* stream_ = nullptr;
+    uv_stream_t *stream_ = nullptr;
 
-    void (*cb_after_write_)(uv_write_t*, int);
-    void (*cb_close_)(uv_handle_t* handle);
+    void (*cb_after_write_)(uv_write_t *, int);
 
-    write_req_t* wr_ = nullptr;
+    void (*cb_close_)(uv_handle_t *handle);
+
+    write_req_t *wr_ = nullptr;
 };
+
+} // namespace enji

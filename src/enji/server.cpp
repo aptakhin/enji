@@ -1,5 +1,7 @@
 #include "server.h"
-#include "common.h"
+#include "http.h"
+
+namespace enji {
 
 Server::Server() {}
 
@@ -9,21 +11,7 @@ Server::Server(ServerOptions&& opts) {
 
 #define assert(expr) {}
 
-class UvProc {
-public:
-    UvProc(uv_stream_t* server);
-    UvProc(uv_stream_t* server, uv_loop_t* loop);
 
-    uv_loop_t* loop() const { return ~loop_; }
-
-    uv_stream_t* server() const { return server_; }
-
-    void run();
-
-protected:
-    ScopePtrExit<uv_loop_t> loop_;
-    uv_stream_t* server_;
-};
 
 UvProc::UvProc(uv_stream_t* server)
     :   server_(server) {
@@ -51,29 +39,6 @@ void UvProc::run() {
         throw std::runtime_error(error);
     }
 }
-
-class UvRequest {
-public:
-    UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc);
-    uv_stream_t* tcp() const { return stream_.get(); }
-
-    void accept();
-
-    void on_after_read(ssize_t nread, const uv_buf_t* buf);
-
-    void on_after_write(uv_write_t* req, int status);
-
-protected:
-    Server::Handler* parent_;
-    IRequestHandler* handler_;
-
-    std::unique_ptr<uv_stream_t> stream_;
-    const UvProc* proc_;
-
-    std::stringstream input_;
-    std::stringstream output_;
-    ConnectionContext ctx_;
-};
 
 void cb_close(uv_handle_t* handle) {
     delete handle;
@@ -128,55 +93,9 @@ void UvRequest::accept() {
     int r = uv_accept(proc_->server(), stream_.get());
 //    assert(r == 0);
 
-//
     r = uv_read_start(stream_.get(), cb_alloc_buffer, cb_after_read);
 //    assert(r == 0);
-
-
 }
-
-class Server::Handler {
-public:
-    Handler(Server* parent, uv_tcp_t* server);
-
-    void run();
-
-    void on_connection(int status);
-    Response find_route(const String& url, UvRequest* req);
-
-    UvProc& proc() { return proc_; }
-
-protected:
-    Server* parent_;
-
-    UvProc proc_;
-
-    std::vector<std::shared_ptr<UvRequest>> requests_;
-};
-
-class HttpRequestHandler : public IRequestHandler {
-public:
-    HttpRequestHandler(Server::Handler* parent);
-    void handle(ConnectionContext context) override;
-
-    int on_http_url(const char* at, size_t len);
-    int on_http_header_field(const char* at, size_t len);
-    int on_http_header_value(const char* at, size_t len);
-    int on_http_headers_complete();
-
-    void check_header_finished();
-
-private:
-    Server::Handler* parent_;
-
-    std::unique_ptr<Request> request_;
-    Response response_;
-    std::unique_ptr<http_parser> parser_;
-
-    typedef std::pair<String, String> RHeader;
-
-    RHeader read_header_;
-};
 
 Server::Handler::Handler(Server* parent, uv_tcp_t* server)
     :   parent_(parent),
@@ -193,14 +112,14 @@ void Server::Handler::run() {
     proc_.run();
 }
 
-Response Server::Handler::find_route(const String& url, UvRequest* req) {
-//    for (auto&& route : parent_->routes_) {
-//        //std::cout << "Url" << "_" << route.path << std::endl;
-//        if (route.path == url) {
-//            auto&& response = route.func(*req->request());
-//            return response;
-//        }
-//    }
+Response Server::Handler::find_route(const String& url, IRequestHandler* handler) {
+    for (auto&& route : parent_->routes_) {
+        //std::cout << "Url" << "_" << route.path << std::endl;
+        if (route.path == url) {
+            auto&& response = route.func(handler->request());
+            return response;
+        }
+    }
     return Response{};
 }
 
@@ -312,121 +231,4 @@ Route::Route(String&& path, Func func)
     func(func) {
 }
 
-int cb_http_message_begin(http_parser* parser) {
-    return 0;
-}
-
-int cb_http_url(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
-    return handler.on_http_url(at, len);
-}
-
-int cb_http_status(http_parser* parser, const char* at, size_t len) {
-    std::cerr << "Got unhandled status: " << String(at, len) << std::endl;
-    return 0;
-}
-
-int cb_http_header_field(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
-    return handler.on_http_header_field(at, len);
-}
-
-int cb_http_header_value(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
-    return handler.on_http_header_value(at, len);
-}
-
-int cb_http_headers_complete(http_parser* parser) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
-    return handler.on_http_headers_complete();
-}
-
-int cb_http_body(http_parser* parser, const char* at, size_t len) {
-    std::cerr << "Got unhandled body: " << String(at, len) << std::endl;
-    return 0;
-}
-
-int cb_http_message_complete(http_parser* parser) {
-    std::cout << "Message complete!" << std::endl;
-    return 0;
-}
-
-static http_parser_settings HttpSettings = {
-    .on_message_begin    = cb_http_message_begin,
-    .on_url              = cb_http_url,
-    .on_status           = cb_http_status,
-    .on_header_field     = cb_http_header_field,
-    .on_header_value     = cb_http_header_value,
-    .on_headers_complete = cb_http_headers_complete,
-    .on_body             = cb_http_body,
-    .on_message_complete = cb_http_message_complete
-};
-
-HttpRequestHandler::HttpRequestHandler(Server::Handler* parent)
-    :   parent_(parent) {
-    parser_.reset(new http_parser);
-    http_parser_init(parser_.get(), HTTP_REQUEST);
-    parser_.get()->data = this;
-
-    request_.reset(new Request);
-}
-
-int HttpRequestHandler::on_http_url(const char* at, size_t len) {
-    request_->url_ += String(at, len);
-    return 0;
-}
-
-int HttpRequestHandler::on_http_header_field(const char* at, size_t len) {
-    check_header_finished();
-    read_header_.first += String(at, len);
-    return 0;
-}
-
-int HttpRequestHandler::on_http_header_value(const char* at, size_t len) {
-    read_header_.second += String(at, len);
-    return 0;
-}
-
-int HttpRequestHandler::on_http_headers_complete() {
-    check_header_finished();
-
-    std::cout << "Headers" << std::endl;
-    for (auto&& i : request_->headers_) {
-        std::cout << i.first << ": " << i.second << std::endl;
-    }
-    return 0;
-}
-
-void HttpRequestHandler::handle(ConnectionContext context) {
-    std::cout << "Handler!" << std::endl;
-    char buf[1024];
-    while (!context.input.eof()) {
-        size_t read = context.input.read(buf, sizeof(buf));
-        http_parser_execute(parser_.get(), &HttpSettings, buf, read);
-    }
-
-    request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
-
-    std::cout << "Parsed: " << request_->url_ << std::endl;
-
-    String resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\nYah2o";
-    context.output.write(resp.c_str(), resp.size());
-
-    //response_ = parent_->find_route(request_->url_, this);
-
-//    if (!response_.buf_.empty()) {
-//        write_req_t* wr = new write_req_t;
-//        size_t size = response_.buf_.size();
-//        wr->buf = uv_buf_init(&response_.buf_[0], size);
-//        r = uv_write(&wr->req, stream_.get(), &wr->buf, 1, cb_after_write);
-//
-//    }
-    //assert(r == 0);
-}
-
-void HttpRequestHandler::check_header_finished() {
-    if (!read_header_.first.empty() && !read_header_.second.empty()) {
-        request_->headers_.insert(
-            Header(std::move(read_header_.first), std::move(read_header_.second)));
-    }
-}
+} // namespace enji
