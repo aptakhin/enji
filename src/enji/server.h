@@ -1,8 +1,13 @@
 #pragma once
 
 #include "common.h"
+#include "coroutines.h"
+
+#include <boost/context/all.hpp>
 
 namespace enji {
+
+class UvRequest;
 
 struct ServerOptions {
     String host;
@@ -11,11 +16,13 @@ struct ServerOptions {
 };
 
 typedef std::pair<String, String> Header;
+
 class HttpRequestHandler;
 
 class Request {
 public:
     friend class UvRequest;
+
     friend class HttpRequestHandler;
 
     const String& url() const { return url_; }
@@ -31,10 +38,12 @@ private:
 class Response {
 public:
     friend class UvRequest;
+
     friend class HttpRequestHandler;
 
-    Response() {}
-    Response(String&& buf) : buf_(buf) {}
+    Response() { }
+
+    Response(String&& buf) : buf_(buf) { }
 
 private:
     String buf_;
@@ -42,7 +51,8 @@ private:
 
 struct Route {
 public:
-    typedef std::function<Response (const Request&)> Func;
+    typedef std::function<Response(const Request&)> Func;
+
     Route(String&& path, Func func);
 
 //protected:
@@ -50,16 +60,19 @@ public:
     String method;
     String name;
     String path;
-    std::function<Response (const Request&)> func;
+    std::function<Response(const Request&)> func;
 };
 
 class Server {
 public:
     class Handler;
+
     friend class Handler;
 
     Server();
+
     Server(ServerOptions&& options);
+
     ~Server();
 
     void setup(ServerOptions&& options);
@@ -87,12 +100,13 @@ public:
 
     virtual const Request& request() const = 0;
 
-    virtual ~IRequestHandler() {}
+    virtual ~IRequestHandler() { }
 };
 
 class UvProc {
 public:
     UvProc(uv_stream_t* server);
+
     UvProc(uv_stream_t* server, uv_loop_t* loop);
 
     uv_loop_t* loop() const { return ~loop_; }
@@ -106,9 +120,23 @@ protected:
     uv_stream_t* server_;
 };
 
+struct SignalEvent {
+    UvRequest* recv;
+    String msg;
+};
+
+void switch2handler(UvRequest* request);
+
+void switch2loop();
+
 class UvRequest {
 public:
+    friend void switch2handler(UvRequest* request);
+
+    friend void switch2loop();
+
     UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc);
+
     uv_stream_t* tcp() const { return stream_.get(); }
 
     void accept();
@@ -116,6 +144,8 @@ public:
     void on_after_read(ssize_t nread, const uv_buf_t* buf);
 
     void on_after_write(uv_write_t* req, int status);
+
+    void handle_event(SignalEvent&& event);
 
 protected:
     Server::Handler* parent_;
@@ -127,15 +157,20 @@ protected:
     std::stringstream input_;
     std::stringstream output_;
     ConnectionContext ctx_;
+
+    boost::context::fcontext_t handler_ctx_;
 };
 
 class Server::Handler {
 public:
+    friend class UvRequest;
+
     Handler(Server* parent, uv_tcp_t* server);
 
     void run();
 
     void on_connection(int status);
+
     Response find_route(const String& url, IRequestHandler* handler);
 
     UvProc& proc() { return proc_; }
@@ -146,6 +181,10 @@ protected:
     UvProc proc_;
 
     std::vector<std::shared_ptr<UvRequest>> requests_;
+
+    SafeQueue<SignalEvent> queue_;
+
+    std::vector<std::thread> threads_;
 };
 
 } // namespace enji

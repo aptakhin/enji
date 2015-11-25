@@ -32,8 +32,8 @@ int cb_http_headers_complete(http_parser* parser) {
 }
 
 int cb_http_body(http_parser* parser, const char* at, size_t len) {
-    std::cerr << "Got unhandled body: " << String(at, len) << std::endl;
-    return 0;
+    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    return handler.on_http_body();
 }
 
 int cb_http_message_complete(http_parser* parser) {
@@ -53,7 +53,7 @@ static http_parser_settings HttpSettings = {
 };
 
 HttpRequestHandler::HttpRequestHandler(Server::Handler* parent)
-    :   parent_(parent) {
+    : parent_(parent) {
     parser_.reset(new http_parser);
     http_parser_init(parser_.get(), HTTP_REQUEST);
     parser_.get()->data = this;
@@ -91,6 +91,12 @@ int HttpRequestHandler::on_http_headers_complete() {
     return 0;
 }
 
+int HttpRequestHandler::on_http_body() {
+    std::cout << "Body" << std::endl;
+
+    return 0;
+}
+
 void HttpRequestHandler::handle(ConnectionContext context) {
     std::cout << "Handler!" << std::endl;
     char buf[1024];
@@ -98,6 +104,11 @@ void HttpRequestHandler::handle(ConnectionContext context) {
         size_t read = context.input.read(buf, sizeof(buf));
         http_parser_execute(parser_.get(), &HttpSettings, buf, read);
     }
+
+    /*
+     *
+     * std::future<
+     */
 
     request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
 

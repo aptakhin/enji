@@ -3,6 +3,7 @@
 #include <http_parser.h>
 
 #include "server.h"
+#include "coroutines.h"
 
 namespace enji {
 
@@ -15,9 +16,14 @@ public:
     const Request& request() const override;
 
     int on_http_url(const char* at, size_t len);
+
     int on_http_header_field(const char* at, size_t len);
+
     int on_http_header_value(const char* at, size_t len);
+
     int on_http_headers_complete();
+
+    int on_http_body();
 
     void check_header_finished();
 
