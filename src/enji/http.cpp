@@ -37,7 +37,6 @@ int cb_http_body(http_parser* parser, const char* at, size_t len) {
 }
 
 int cb_http_message_complete(http_parser* parser) {
-    std::cout << "Message complete!" << std::endl;
     return 0;
 }
 
@@ -83,22 +82,14 @@ int HttpRequestHandler::on_http_header_value(const char* at, size_t len) {
 
 int HttpRequestHandler::on_http_headers_complete() {
     check_header_finished();
-
-    std::cout << "Headers" << std::endl;
-    for (auto&& i : request_->headers_) {
-        std::cout << i.first << ": " << i.second << std::endl;
-    }
     return 0;
 }
 
 int HttpRequestHandler::on_http_body() {
-    std::cout << "Body" << std::endl;
-
     return 0;
 }
 
 void HttpRequestHandler::handle(ConnectionContext context) {
-    std::cout << "Handler!" << std::endl;
     char buf[1024];
     while (!context.input.eof()) {
         size_t read = context.input.read(buf, sizeof(buf));
@@ -106,26 +97,14 @@ void HttpRequestHandler::handle(ConnectionContext context) {
     }
 
     /*
-     *
-     * std::future<
+     * std::future
      */
 
     request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
 
-    std::cout << "Parsed: " << request_->url_ << std::endl;
-
     response_ = parent_->find_route(request_->url_, this);
 
     context.output.write(&response_.buf_[0], response_.buf_.size());
-
-//    if (!response_.buf_.empty()) {
-//        write_req_t* wr = new write_req_t;
-//        size_t size = response_.buf_.size();
-//        wr->buf = uv_buf_init(&response_.buf_[0], size);
-//        r = uv_write(&wr->req, stream_.get(), &wr->buf, 1, cb_after_write);
-//
-//    }
-    //assert(r == 0);
 }
 
 void HttpRequestHandler::check_header_finished() {

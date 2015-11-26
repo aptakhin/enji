@@ -12,6 +12,8 @@
 
 namespace enji {
 
+class UvRequest;
+
 typedef std::string String;
 
 template<typename Resource>
@@ -82,11 +84,13 @@ public:
         queue_.emplace(value);
     }
 
-    T pop() {
+    bool pop(T& obj) {
         std::lock_guard<std::mutex> guard(mutex_);
-        T top = std::move(queue_.front());
+        if (queue_.empty())
+            return false;
+        obj = std::move(queue_.front());
         queue_.pop();
-        return top;
+        return true;
     }
 
     bool empty() const {
@@ -96,7 +100,7 @@ public:
 
 private:
     std::queue<T> queue_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
 };
 
 class IInputStream {
@@ -158,6 +162,7 @@ private:
 typedef struct {
     uv_write_t req;
     uv_buf_t buf;
+    UvRequest* recv;
     bool close = false;
 } write_req_t;
 

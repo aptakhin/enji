@@ -120,20 +120,64 @@ protected:
     uv_stream_t* server_;
 };
 
+enum SignalAddType {
+    NONE,
+    CLOSE,
+    CLOSE_CONFIRMED,
+};
+
 struct SignalEvent {
     UvRequest* recv;
-    String msg;
+    uv_buf_t buf;
+    SignalAddType signal;
 };
 
 void switch2handler(UvRequest* request);
 
 void switch2loop();
 
+void handleri(intptr_t in);
+
+class Server::Handler {
+public:
+    friend class UvRequest;
+    friend void handleri(intptr_t in);
+
+    Handler(Server* parent, uv_tcp_t* server);
+
+    void run();
+
+    void on_connection(int status);
+    void on_loop();
+
+    Response find_route(const String& url, IRequestHandler* handler);
+
+    UvProc& proc() { return proc_; }
+
+    void request_finished(UvRequest* pRequest);
+
+protected:
+    Server* parent_;
+
+    UvProc proc_;
+
+    ScopePtrExit<uv_idle_t> on_loop_;
+
+    std::vector<std::shared_ptr<UvRequest>> requests_;
+
+    SafeQueue<SignalEvent> input_queue_;
+    SafeQueue<SignalEvent> output_queue_;
+
+    std::vector<std::thread> threads_;
+
+};
+
 class UvRequest {
 public:
     friend void switch2handler(UvRequest* request);
-
     friend void switch2loop();
+    friend void handleri(intptr_t in);
+    friend class Server::Handler;
 
     UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc);
 
@@ -159,32 +203,7 @@ protected:
     ConnectionContext ctx_;
 
     boost::context::fcontext_t handler_ctx_;
-};
-
-class Server::Handler {
-public:
-    friend class UvRequest;
-
-    Handler(Server* parent, uv_tcp_t* server);
-
-    void run();
-
-    void on_connection(int status);
-
-    Response find_route(const String& url, IRequestHandler* handler);
-
-    UvProc& proc() { return proc_; }
-
-protected:
-    Server* parent_;
-
-    UvProc proc_;
-
-    std::vector<std::shared_ptr<UvRequest>> requests_;
-
-    SafeQueue<SignalEvent> queue_;
-
-    std::vector<std::thread> threads_;
+    std::unique_ptr<char> handler_ctx_stack_;
 };
 
 } // namespace enji

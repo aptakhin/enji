@@ -1,9 +1,11 @@
 #include "server.h"
 #include "http.h"
+#include "common.h"
+#include <chrono>
 
 namespace enji {
 
-__thread boost::context::fcontext_t* g_parent_ctx;
+__thread boost::context::fcontext_t g_parent_ctx;
 __thread boost::context::fcontext_t* g_handler_ctx;
 
 Server::Server() { }
@@ -47,8 +49,8 @@ void cb_close(uv_handle_t* handle) {
 }
 
 void cb_after_write(uv_write_t* req, int status) {
-    UvRequest& request = *reinterpret_cast<UvRequest*>(req->data);
-    request.on_after_write(req, status);
+    write_req_t* wr = (write_req_t*)req;
+    wr->recv->on_after_write(req, status);
 }
 
 void cb_after_shutdown(uv_shutdown_t* req, int status) {
@@ -61,7 +63,7 @@ void cb_after_shutdown(uv_shutdown_t* req, int status) {
 }
 
 void cb_alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-    std::cout << "Callback alloc " << suggested_size << std::endl;
+    //std::cout << "Callback alloc " << suggested_size << std::endl;
     buf->base = new char[suggested_size];
     buf->len = suggested_size;
 }
@@ -79,8 +81,23 @@ void cb_after_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 }
 
 void handleri(intptr_t in) {
-    std::cout << "Handler" << std::endl;
+    UvRequest* req = reinterpret_cast<UvRequest*>(in);
+    req->handler_->handle(req->ctx_);
 
+    while (req->output_) {
+        size_t alloc_memory = 1024;
+        char* tmp_buf = new char[alloc_memory];
+        req->output_.read(tmp_buf, alloc_memory);
+        size_t size = req->output_.gcount();
+        uv_buf_t send_buf = uv_buf_init(tmp_buf, size);
+        SignalAddType signal = SignalAddType::NONE;
+        if (size < alloc_memory) {
+            signal = SignalAddType::CLOSE;
+        }
+        req->parent_->output_queue_.push(SignalEvent{req, send_buf, signal});
+    }
+
+    switch2loop();
 }
 
 UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc)
@@ -96,8 +113,8 @@ UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const Uv
     stream->data = this;
 
     std::size_t size = 8192;
-    void* sp = std::malloc(size);
-    handler_ctx_ = boost::context::make_fcontext(sp, size, handleri);
+    handler_ctx_stack_.reset(new char[size]);
+    handler_ctx_ = boost::context::make_fcontext(handler_ctx_stack_.get(), size, handleri);
 }
 
 void UvRequest::accept() {
@@ -119,17 +136,68 @@ void Server::Handler::on_connection(int status) {
     requests_.push_back(new_req);
 }
 
+void idle_cb(uv_idle_t* handle) {
+    Server::Handler& that = *reinterpret_cast<Server::Handler*>(handle->data);
+    that.on_loop();
+}
+
+void Server::Handler::on_loop() {
+    SignalEvent msg;
+    while (true) {
+        if (output_queue_.pop(msg)) {
+            if (msg.signal == SignalAddType::NONE || msg.signal == SignalAddType::CLOSE) {
+                write_req_t* wr = new write_req_t;
+                wr->recv = msg.recv;
+                wr->buf = msg.buf;
+                if (msg.signal == SignalAddType::CLOSE) {
+                    wr->close = true;
+                }
+                int r = uv_write(&wr->req, msg.recv->stream_.get(), &wr->buf, 1, cb_after_write);
+            }
+            else if (msg.signal == SignalAddType::CLOSE_CONFIRMED) {
+                UvRequest* remove_req = msg.recv;
+                auto found = std::find_if(requests_.begin(), requests_.end(),
+                                          [remove_req] (std::shared_ptr<UvRequest> req) {
+                                              return req.get() == remove_req; });
+                requests_.erase(found);
+            }
+        }
+        if (output_queue_.empty())
+            break;
+    }
+}
+
 void Server::Handler::run() {
-    for (size_t i = 0; i < 4; ++i) {
+    uv_idle_t* on_loop = new uv_idle_t;
+    uv_idle_init(proc_.loop(), on_loop);
+    on_loop->data = this;
+    on_loop_.reset(on_loop, [](uv_idle_t* idle){ uv_idle_stop(idle); delete idle; });
+    uv_idle_start(on_loop, idle_cb);
+
+    for (size_t i = 0; i < 1; ++i) {
         threads_.push_back(std::thread{[&]() {
+            SignalEvent msg;
             while (true) {
-                SignalEvent msg = queue_.pop();
-                msg.recv->handle_event(std::move(msg));
+                try {
+                    if (input_queue_.pop(msg)) {
+                        msg.recv->handle_event(std::move(msg));
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::microseconds(100));
+                    }
+                }
+                catch(...) {
+                    std::cout << "Err";
+                }
             }
         }});
     }
 
     proc_.run();
+}
+
+
+void Server::Handler::request_finished(UvRequest* request) {
+    output_queue_.push(SignalEvent{request, uv_buf_t{}, SignalAddType::CLOSE_CONFIRMED});
 }
 
 Response Server::Handler::find_route(const String& url, IRequestHandler* handler) {
@@ -146,22 +214,8 @@ Response Server::Handler::find_route(const String& url, IRequestHandler* handler
 void UvRequest::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     std::cout << "Got " << nread << std::endl;
 
-    parent_->queue_.push(SignalEvent{this, String(buf->base, nread)});
-
-//    input_.write(buf->base, nread);
-//    handler_->handle(ctx_);
-//
-//    while (output_) {
-//        char tmp_buf[1024];
-//        output_.read(tmp_buf, sizeof(tmp_buf));
-//        size_t size = output_.gcount();
-//        write_req_t* wr = new write_req_t;
-//        wr->buf = uv_buf_init(tmp_buf, size);
-//        if (size < sizeof(tmp_buf)) {
-//            wr->close = true;
-//        }
-//        int r = uv_write(&wr->req, stream_.get(), &wr->buf, 1, cb_after_write);
-//    }
+    uv_buf_t send_buf = uv_buf_init(buf->base, nread);
+    parent_->input_queue_.push(SignalEvent{this, send_buf, SignalAddType::NONE});
 
     if (nread <= 0 && buf->base != nullptr)
         delete[] buf->base;
@@ -183,8 +237,6 @@ void UvRequest::on_after_read(ssize_t nread, const uv_buf_t* buf) {
 void UvRequest::on_after_write(uv_write_t* req, int status) {
     write_req_t* wr = reinterpret_cast<write_req_t*>(req);
 
-    delete wr;
-
     std::cout << "Wrote: " << status << std::endl;
 
 //    if (status == 0)
@@ -199,12 +251,15 @@ void UvRequest::on_after_write(uv_write_t* req, int status) {
     if (wr->close) {
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
+
+    delete wr;
+
+    parent_->request_finished(this);
 }
 
 void UvRequest::handle_event(SignalEvent&& event) {
-    input_.write(&event.msg[0], event.msg.size());
-    handler_->handle(ctx_);
-    //thread_->
+    input_.write(event.buf.base, event.buf.len);
+    switch2handler(event.recv);
 }
 
 void on_connection(uv_stream_t* server, int status) {
@@ -261,14 +316,15 @@ Route::Route(String&& path, Func func)
 
 void switch2handler(UvRequest* request) {
     g_handler_ctx = &request->handler_ctx_;
-    boost::context::jump_fcontext(g_parent_ctx, *g_handler_ctx, (intptr_t) request);
+    boost::context::jump_fcontext(&g_parent_ctx, *g_handler_ctx, (intptr_t) request);
     /// init here
 }
 
 void switch2loop() {
     boost::context::fcontext_t* handler = g_handler_ctx;
     g_handler_ctx = nullptr;
-    boost::context::jump_fcontext(handler, *g_parent_ctx, 0);
+    boost::context::jump_fcontext(handler, g_parent_ctx, 0);
 }
+
 
 } // namespace enji
