@@ -191,6 +191,8 @@ public:
 
     void handle_event(SignalEvent&& event);
 
+    void notify_closed();
+
 protected:
     Server::Handler* parent_;
     IRequestHandler* handler_;
@@ -202,8 +204,9 @@ protected:
     std::stringstream output_;
     ConnectionContext ctx_;
 
-    boost::context::fcontext_t handler_ctx_;
     std::unique_ptr<char> handler_ctx_stack_;
+    boost::context::fcontext_t handler_ctx_;
+
 };
 
 } // namespace enji

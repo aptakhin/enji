@@ -14,8 +14,6 @@ Server::Server(ServerOptions&& opts) {
     setup(std::move(opts));
 }
 
-#define assert(expr) {}
-
 
 UvProc::UvProc(uv_stream_t* server)
     : server_(server) {
@@ -45,12 +43,17 @@ void UvProc::run() {
 }
 
 void cb_close(uv_handle_t* handle) {
+    UvRequest& req = *reinterpret_cast<UvRequest*>(handle->data);
+    req.notify_closed();
+
     delete handle;
+
 }
 
-void cb_after_write(uv_write_t* req, int status) {
-    write_req_t* wr = (write_req_t*)req;
-    wr->recv->on_after_write(req, status);
+void cb_after_write(uv_write_t* write, int status) {
+    //write_req_t* wr = (write_req_t*)req;
+    UvRequest& req = *reinterpret_cast<UvRequest*>(write->data);
+    req.on_after_write(write, status);
 }
 
 void cb_after_shutdown(uv_shutdown_t* req, int status) {
@@ -149,6 +152,7 @@ void Server::Handler::on_loop() {
                 write_req_t* wr = new write_req_t;
                 wr->recv = msg.recv;
                 wr->buf = msg.buf;
+                wr->req.data = wr->recv;
                 if (msg.signal == SignalAddType::CLOSE) {
                     wr->close = true;
                 }
@@ -236,6 +240,7 @@ void UvRequest::on_after_read(ssize_t nread, const uv_buf_t* buf) {
 
 void UvRequest::on_after_write(uv_write_t* req, int status) {
     write_req_t* wr = reinterpret_cast<write_req_t*>(req);
+    req->handle->data = wr->recv;
 
     std::cout << "Wrote: " << status << std::endl;
 
@@ -253,13 +258,15 @@ void UvRequest::on_after_write(uv_write_t* req, int status) {
     }
 
     delete wr;
-
-    parent_->request_finished(this);
 }
 
 void UvRequest::handle_event(SignalEvent&& event) {
     input_.write(event.buf.base, event.buf.len);
     switch2handler(event.recv);
+}
+
+void UvRequest::notify_closed() {
+    parent_->request_finished(this);
 }
 
 void on_connection(uv_stream_t* server, int status) {
