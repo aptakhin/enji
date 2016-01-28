@@ -3,7 +3,6 @@
 #include <http_parser.h>
 
 #include "server.h"
-#include "coroutines.h"
 
 namespace enji {
 

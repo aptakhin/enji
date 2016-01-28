@@ -8,6 +8,10 @@
 #include <queue>
 #include <thread>
 
+#ifdef _MSC_VER
+#	include <mutex>
+#endif
+
 #include <uv.h>
 
 namespace enji {

@@ -3,9 +3,6 @@
 
 namespace enji {
 
-__thread boost::context::fcontext_t g_parent_ctx;
-__thread boost::context::fcontext_t* g_handler_ctx;
-
 Server::Server() { }
 
 Server::Server(ServerOptions&& opts) {
@@ -91,8 +88,6 @@ void handleri(intptr_t in) {
         }
         req->parent_->output_queue_.push(SignalEvent{req, send_buf, signal});
     }
-
-    switch2loop();
 }
 
 UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc, size_t id)
@@ -110,7 +105,7 @@ UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const Uv
 
     std::size_t size = 1024;
     handler_ctx_stack_.reset(new char[size]);
-    handler_ctx_ = boost::context::make_fcontext(handler_ctx_stack_.get(), size, handleri);
+    //handler_ctx_ = boost::context::make_fcontext(handler_ctx_stack_.get(), size, handleri);
 }
 
 std::ostream& UvRequest::log() {
@@ -237,7 +232,7 @@ void UvRequest::on_after_read(ssize_t nread, const uv_buf_t* buf) {
         uv_shutdown_t* shutdown = new uv_shutdown_t;
         shutdown->data = this;
         int r = uv_shutdown(shutdown, stream_.get(), cb_after_shutdown);
-        assert(r == 0);
+        //assert(r == 0);
     }
 }
 
@@ -277,7 +272,6 @@ void UvRequest::on_after_shutdown(uv_shutdown_t* shutdown, int status) {
 
 void UvRequest::handle_event(SignalEvent&& event) {
     input_.write(event.buf.base, event.buf.len);
-    switch2handler(event.recv);
 }
 
 void UvRequest::notify_closed() {
@@ -335,18 +329,18 @@ Route::Route(String&& path, Func func)
     : path(path),
       func(func) {
 }
-
-void switch2handler(UvRequest* request) {
-    g_handler_ctx = &request->handler_ctx_;
-    boost::context::jump_fcontext(&g_parent_ctx, *g_handler_ctx, (intptr_t) request);
-    /// init here
-}
-
-void switch2loop() {
-    boost::context::fcontext_t* handler = g_handler_ctx;
-    g_handler_ctx = nullptr;
-    boost::context::jump_fcontext(handler, g_parent_ctx, 0);
-}
+//
+//void switch2handler(UvRequest* request) {
+//    g_handler_ctx = &request->handler_ctx_;
+//    boost::context::jump_fcontext(&g_parent_ctx, *g_handler_ctx, (intptr_t) request);
+//    /// init here
+//}
+//
+//void switch2loop() {
+//    boost::context::fcontext_t* handler = g_handler_ctx;
+//    g_handler_ctx = nullptr;
+//    boost::context::jump_fcontext(handler, g_parent_ctx, 0);
+//}
 
 
 } // namespace enji

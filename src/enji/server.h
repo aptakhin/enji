@@ -1,9 +1,6 @@
 #pragma once
 
 #include "common.h"
-#include "coroutines.h"
-
-#include <boost/context/all.hpp>
 
 namespace enji {
 
@@ -134,9 +131,6 @@ struct SignalEvent {
     RequestSignalType signal;
 };
 
-void switch2handler(UvRequest* request);
-
-void switch2loop();
 
 void handleri(intptr_t in);
 
@@ -177,8 +171,6 @@ protected:
 
 class UvRequest {
 public:
-    friend void switch2handler(UvRequest* request);
-    friend void switch2loop();
     friend void handleri(intptr_t in);
     friend class Server::Handler;
 
@@ -212,7 +204,6 @@ protected:
     ConnectionContext ctx_;
 
     std::unique_ptr<char> handler_ctx_stack_;
-    boost::context::fcontext_t handler_ctx_;
 
     size_t id_;
 };
