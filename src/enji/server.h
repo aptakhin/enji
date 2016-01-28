@@ -120,8 +120,10 @@ protected:
     uv_stream_t* server_;
 };
 
-enum SignalAddType {
+enum RequestSignalType {
     NONE,
+    WRITE,
+    INPUT_EOF,
     CLOSE,
     CLOSE_CONFIRMED,
 };
@@ -129,7 +131,7 @@ enum SignalAddType {
 struct SignalEvent {
     UvRequest* recv;
     uv_buf_t buf;
-    SignalAddType signal;
+    RequestSignalType signal;
 };
 
 void switch2handler(UvRequest* request);
@@ -170,6 +172,7 @@ protected:
 
     std::vector<std::thread> threads_;
 
+    size_t counter_ = 0;
 };
 
 class UvRequest {
@@ -179,7 +182,7 @@ public:
     friend void handleri(intptr_t in);
     friend class Server::Handler;
 
-    UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc);
+    UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc, size_t id);
 
     uv_stream_t* tcp() const { return stream_.get(); }
 
@@ -188,10 +191,14 @@ public:
     void on_after_read(ssize_t nread, const uv_buf_t* buf);
 
     void on_after_write(uv_write_t* req, int status);
+    void on_after_shutdown(uv_shutdown_t* shutdown, int status);
 
     void handle_event(SignalEvent&& event);
 
     void notify_closed();
+
+protected:
+    std::ostream& log();
 
 protected:
     Server::Handler* parent_;
@@ -207,6 +214,7 @@ protected:
     std::unique_ptr<char> handler_ctx_stack_;
     boost::context::fcontext_t handler_ctx_;
 
+    size_t id_;
 };
 
 } // namespace enji

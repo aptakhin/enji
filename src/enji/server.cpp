@@ -1,7 +1,5 @@
 #include "server.h"
 #include "http.h"
-#include "common.h"
-#include <chrono>
 
 namespace enji {
 
@@ -47,22 +45,16 @@ void cb_close(uv_handle_t* handle) {
     req.notify_closed();
 
     delete handle;
-
 }
 
 void cb_after_write(uv_write_t* write, int status) {
-    //write_req_t* wr = (write_req_t*)req;
     UvRequest& req = *reinterpret_cast<UvRequest*>(write->data);
     req.on_after_write(write, status);
 }
 
-void cb_after_shutdown(uv_shutdown_t* req, int status) {
-    /*assert(status == 0);*/
-    if (status < 0)
-        fprintf(stderr, "err: %s\n", uv_strerror(status));
-    fprintf(stderr, "data received\n");
-    uv_close((uv_handle_t*) req->handle, cb_close);
-    delete req;
+void cb_after_shutdown(uv_shutdown_t* shutdown, int status) {
+    UvRequest& req = *reinterpret_cast<UvRequest*>(shutdown->data);
+    req.on_after_shutdown(shutdown, status);
 }
 
 void cb_alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
@@ -93,9 +85,9 @@ void handleri(intptr_t in) {
         req->output_.read(tmp_buf, alloc_memory);
         size_t size = req->output_.gcount();
         uv_buf_t send_buf = uv_buf_init(tmp_buf, size);
-        SignalAddType signal = SignalAddType::NONE;
+        RequestSignalType signal = RequestSignalType::WRITE;
         if (size < alloc_memory) {
-            signal = SignalAddType::CLOSE;
+            signal = RequestSignalType::CLOSE;
         }
         req->parent_->output_queue_.push(SignalEvent{req, send_buf, signal});
     }
@@ -103,25 +95,33 @@ void handleri(intptr_t in) {
     switch2loop();
 }
 
-UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc)
+UvRequest::UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc, size_t id)
     : parent_(parent),
       handler_(handler),
       proc_(proc),
       input_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
       output_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
-      ctx_{StdInputStream(input_), StdOutputStream(output_)} {
+      ctx_{StdInputStream(input_), StdOutputStream(output_)},
+      id_(id) {
     uv_tcp_t* stream = new uv_tcp_t;
     stream_.reset(reinterpret_cast<uv_stream_t*>(stream));
     int r = uv_tcp_init(proc_->loop(), stream);
     stream->data = this;
 
-    std::size_t size = 8192;
+    std::size_t size = 1024;
     handler_ctx_stack_.reset(new char[size]);
     handler_ctx_ = boost::context::make_fcontext(handler_ctx_stack_.get(), size, handleri);
 }
 
+std::ostream& UvRequest::log() {
+    std::cout << "[" << id_ << "] ";
+    return std::cout;
+}
+
 void UvRequest::accept() {
+    log() << "before accept\n";
     int r = uv_accept(proc_->server(), stream_.get());
+    log() << "after accept\n";
 //    assert(r == 0);
 
     r = uv_read_start(stream_.get(), cb_alloc_buffer, cb_after_read);
@@ -134,7 +134,7 @@ Server::Handler::Handler(Server* parent, uv_tcp_t* server)
 }
 
 void Server::Handler::on_connection(int status) {
-    auto new_req = std::make_shared<UvRequest>(this, new HttpRequestHandler{this}, &proc_);
+    auto new_req = std::make_shared<UvRequest>(this, new HttpRequestHandler{this}, &proc_, counter_++);
     new_req->accept();
     requests_.push_back(new_req);
 }
@@ -148,22 +148,22 @@ void Server::Handler::on_loop() {
     SignalEvent msg;
     while (true) {
         if (output_queue_.pop(msg)) {
-            if (msg.signal == SignalAddType::NONE || msg.signal == SignalAddType::CLOSE) {
+            if (msg.signal == RequestSignalType::WRITE || msg.signal == RequestSignalType::CLOSE) {
                 write_req_t* wr = new write_req_t;
                 wr->recv = msg.recv;
                 wr->buf = msg.buf;
                 wr->req.data = wr->recv;
-                if (msg.signal == SignalAddType::CLOSE) {
+                if (msg.signal == RequestSignalType::CLOSE) {
                     wr->close = true;
                 }
                 int r = uv_write(&wr->req, msg.recv->stream_.get(), &wr->buf, 1, cb_after_write);
             }
-            else if (msg.signal == SignalAddType::CLOSE_CONFIRMED) {
+            else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
                 UvRequest* remove_req = msg.recv;
-                auto found = std::find_if(requests_.begin(), requests_.end(),
-                                          [remove_req] (std::shared_ptr<UvRequest> req) {
-                                              return req.get() == remove_req; });
-                requests_.erase(found);
+//                auto found = std::find_if(requests_.begin(), requests_.end(),
+//                                          [remove_req] (std::shared_ptr<UvRequest> req) {
+//                                              return req.get() == remove_req; });
+                //requests_.erase(found);
             }
         }
         if (output_queue_.empty())
@@ -201,7 +201,7 @@ void Server::Handler::run() {
 
 
 void Server::Handler::request_finished(UvRequest* request) {
-    output_queue_.push(SignalEvent{request, uv_buf_t{}, SignalAddType::CLOSE_CONFIRMED});
+    output_queue_.push(SignalEvent{request, uv_buf_t{}, RequestSignalType::CLOSE_CONFIRMED});
 }
 
 Response Server::Handler::find_route(const String& url, IRequestHandler* handler) {
@@ -216,25 +216,28 @@ Response Server::Handler::find_route(const String& url, IRequestHandler* handler
 }
 
 void UvRequest::on_after_read(ssize_t nread, const uv_buf_t* buf) {
-    std::cout << "Got " << nread << std::endl;
+    log() << "read bytes " << nread << std::endl;
 
-    uv_buf_t send_buf = uv_buf_init(buf->base, nread);
-    parent_->input_queue_.push(SignalEvent{this, send_buf, SignalAddType::NONE});
+    if (nread > 0) {
+        uv_buf_t send_buf = uv_buf_init(buf->base, nread);
+        parent_->input_queue_.push(SignalEvent{this, send_buf, RequestSignalType::WRITE});
+    }
 
-    if (nread <= 0 && buf->base != nullptr)
+    if (nread <= 0)
         delete[] buf->base;
 
     if (nread == 0)
         return;
 
     if (nread < 0) {
+        //parent_->output_queue_.push(SignalEvent{this, uv_buf_t{}, RequestSignalType::INPUT_EOF});
         /*assert(nread == UV_EOF);*/
-        fprintf(stderr, "err: %s\n", uv_strerror(nread));
+        log() << "err: " << uv_strerror(nread) << "\n";
 
         uv_shutdown_t* shutdown = new uv_shutdown_t;
+        shutdown->data = this;
         int r = uv_shutdown(shutdown, stream_.get(), cb_after_shutdown);
         assert(r == 0);
-        return;
     }
 }
 
@@ -242,7 +245,7 @@ void UvRequest::on_after_write(uv_write_t* req, int status) {
     write_req_t* wr = reinterpret_cast<write_req_t*>(req);
     req->handle->data = wr->recv;
 
-    std::cout << "Wrote: " << status << std::endl;
+    log() << "status: " << status << "\n";
 
 //    if (status == 0)
 //        return;
@@ -254,10 +257,22 @@ void UvRequest::on_after_write(uv_write_t* req, int status) {
 //
 //    assert(status == UV_EPIPE);
     if (wr->close) {
+        log() << "close" << "\n";
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
 
     delete wr;
+}
+
+void UvRequest::on_after_shutdown(uv_shutdown_t* shutdown, int status) {
+    /*assert(status == 0);*/
+    if (status < 0)
+        log() << "err " << uv_strerror(status) << "\n";
+
+    uv_close((uv_handle_t*) shutdown->handle, cb_close);
+    delete shutdown;
+
+    parent_->request_finished(this);
 }
 
 void UvRequest::handle_event(SignalEvent&& event) {
