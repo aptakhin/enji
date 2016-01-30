@@ -10,68 +10,68 @@ class HttpOutput;
 
 class HttpRequest {
 public:
-	friend class HttpConnection;
+    friend class HttpConnection;
 
-	const String& url() const { return url_; }
+    const String& url() const { return url_; }
 
-	const String& body() const { return body_; }
+    const String& body() const { return body_; }
 
 private:
-	String method_;
-	String url_;
-	bool url_ready_;
+    String method_;
+    String url_;
+    bool url_ready_;
 
-	std::multimap<String, String> headers_;
+    std::multimap<String, String> headers_;
 
-	String body_;
+    String body_;
 };
 
 class HttpOutput {
 public:
-	HttpOutput(HttpConnection* conn);
+    HttpOutput(HttpConnection* conn);
 
-	HttpOutput& header(const String& name, const String& value);
-	HttpOutput& body(const String& value);
+    HttpOutput& header(const String& name, const String& value);
+    HttpOutput& body(const String& value);
 
-	void close();
+    void close();
 
 private:
-	HttpConnection* conn_;
+    HttpConnection* conn_;
 };
 
 struct HttpRoute {
 public:
-	typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
+    typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
 
-	HttpRoute(String&& path, Handler handler);
+    HttpRoute(String&& path, Handler handler);
 
-	//protected:
+    //protected:
 public:
-	String method;
-	String name;
-	String path;
-	Handler handler;
+    String method;
+    String name;
+    String path;
+    Handler handler;
 };
 
 class HttpServer : public Server {
 public:
-	HttpServer(ServerOptions&& options);
+    HttpServer(ServerOptions&& options);
 
-	void on_connection(int status) override;
+    void on_connection(int status) override;
 
-	void add_route(HttpRoute&& route);
+    void add_route(HttpRoute&& route);
 
-	void call_handler(const HttpRequest& request, HttpConnection* bind);
+    void call_handler(const HttpRequest& request, HttpConnection* bind);
 
 protected:
-	std::vector<HttpRoute> routes_;
+    std::vector<HttpRoute> routes_;
 };
 
 class HttpConnection : public Connection {
 public:
-	HttpConnection(HttpServer* parent, size_t id);
+    HttpConnection(HttpServer* parent, size_t id);
 
-	void handle_input(StringView data) override;
+    void handle_input(StringView data) override;
 
     const HttpRequest& request() const;
 
@@ -84,12 +84,12 @@ public:
     int on_http_headers_complete();
 
     int on_http_body();
-	int on_message_complete();
+    int on_message_complete();
 
     void check_header_finished();
 
 private:
-	HttpServer* parent_;
+    HttpServer* parent_;
 
     std::unique_ptr<HttpRequest> request_;
     //Response response_;
@@ -98,7 +98,7 @@ private:
     typedef std::pair<String, String> RHeader;
 
     RHeader read_header_;
-	bool message_completed_ = false;
+    bool message_completed_ = false;
 };
 
 } // namespace enji
