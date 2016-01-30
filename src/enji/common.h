@@ -129,68 +129,11 @@ public:
     virtual ~IOutputStream() { }
 };
 
-class StdInputStream : public IInputStream {
-public:
-    StdInputStream(std::stringstream& in);
-
-    size_t read(char* data, size_t bytes) override;
-
-    bool eof() const { return in_.eof(); }
-
-    void close() override;
-
-private:
-    std::stringstream& in_;
-};
-
-class StdOutputStream : public IOutputStream {
-public:
-    StdOutputStream(std::stringstream& out);
-
-    void write(const char* data, size_t bytes) override;
-
-    void close() override;
-
-private:
-    std::stringstream& out_;
-};
-
-
-class IoBuffer {
-public:
-
-    std::unique_ptr<IInputStream> create_reader();
-
-    std::unique_ptr<IOutputStream> create_writer();
-
-private:
-    std::stringstream buffer_;
-};
-
 struct WriteContext {
     uv_write_t req;
     uv_buf_t buf;
     Connection* conn;
     bool close = false;
-};
-
-class UvOutputStream : public IOutputStream {
-public:
-    UvOutputStream(uv_stream_t* stream, void (* cb_after_write)(uv_write_t*, int),
-                   void (* cb_close)(uv_handle_t* handle));
-
-    void write(const char* data, size_t bytes) override;
-
-    void close() override;
-
-private:
-    uv_stream_t* stream_ = nullptr;
-
-    void (* cb_after_write_)(uv_write_t*, int);
-
-    void (* cb_close_)(uv_handle_t* handle);
-
-    WriteContext* wr_ = nullptr;
 };
 
 class StringView {

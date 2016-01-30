@@ -49,9 +49,8 @@ protected:
 };
 
 enum RequestSignalType {
-    NONE,
+    READ,
     WRITE,
-    INPUT_EOF,
     CLOSE,
     CLOSE_CONFIRMED,
 };
@@ -84,10 +83,13 @@ public:
 
     void request_finished(Connection* pRequest);
 
+    void queue_read(Connection* conn, OweMem mem_block);
     void queue_write(Connection* conn, OweMem mem_block);
     void queue_close(Connection* conn);
 
 protected:
+    ServerOptions base_options_;
+
     std::unique_ptr<EventLoop> event_loop_;
 
     ScopePtrExit<uv_idle_t> on_loop_;

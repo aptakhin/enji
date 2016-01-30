@@ -99,35 +99,14 @@ int HttpConnection::on_message_complete() {
 }
 
 void HttpConnection::handle_input(StringView data) {
-    std::cout << String(data.data, data.data + data.size);
+    //std::cout << String(data.data, data.data + data.size);
     http_parser_execute(parser_.get(), &get_http_settings(), data.data, data.size);
     
     if (message_completed_) {
-        std::cout << "Now parse it!\n";
-
         request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
-
         parent_->call_handler(*request_.get(), this);
     }
 }
-
-//void HttpConnection::handle_input(const String& data) {
-//    char buf[1024];
-//    while (!context.input.eof()) {
-//        size_t read = context.input.read(buf, sizeof(buf));
-//        http_parser_execute(parser_.get(), &get_http_settings(), buf, read);
-//    }
-//
-//    /*
-//     * std::future
-//     */
-//
-//    request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
-//
-//    response_ = parent_->find_route(request_->url_, this);
-//
-//    context.output.write(&response_.buf_[0], response_.buf_.size());
-//}
 
 void HttpConnection::check_header_finished() {
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
@@ -135,11 +114,6 @@ void HttpConnection::check_header_finished() {
             Header(std::move(read_header_.first), std::move(read_header_.second)));
     }
 }
-
-//Response Server::Handler::find_route(const String& url, IRequestHandler* handler) {
-//    
-//    return Response{};
-//}
 
 HttpOutput::HttpOutput(HttpConnection* conn)
 :   conn_(conn) {
@@ -184,7 +158,6 @@ void HttpServer::add_route(HttpRoute&& route) {
 
 void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
-        //std::cout << "Url" << "_" << route.path << std::endl;
         if (route.path == request.url()) {
             HttpOutput out(bind);
             route.handler(request, out);
