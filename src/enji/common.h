@@ -16,7 +16,7 @@
 
 namespace enji {
 
-class UvRequest;
+class Connection;
 
 typedef std::string String;
 
@@ -28,10 +28,12 @@ public:
     ScopeExit() { }
 
     ScopeExit(Resource&& resource, Deleter&& deleter)
-        : on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) { }
+    :	on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) {}
 
     void reset(Resource&& resource, Deleter&& deleter) {
-        on_ = std::unique_ptr<Resource, Deleter>(std::forward<Resource>(resource), std::forward<Deleter>(deleter));
+        on_ = std::unique_ptr<Resource, Deleter>(
+			std::forward<Resource>(resource), std::forward<Deleter>(deleter)
+		);
     }
 
     Resource* operator ~() {
@@ -50,7 +52,7 @@ public:
     ScopePtrExit() { }
 
     ScopePtrExit(Resource* resource, Deleter&& deleter)
-        : on_(resource, std::forward<Deleter>(deleter)) { }
+    :	on_(resource, std::forward<Deleter>(deleter)) { }
 
     void reset(Resource* resource, Deleter&& deleter) {
         on_ = std::unique_ptr<Resource, Deleter>(resource, std::forward<Deleter>(deleter));
@@ -122,6 +124,8 @@ public:
 
     virtual void close() = 0;
 
+	virtual void flush() = 0;
+
     virtual ~IOutputStream() { }
 };
 
@@ -163,12 +167,12 @@ private:
     std::stringstream buffer_;
 };
 
-typedef struct {
-    uv_write_t req;
-    uv_buf_t buf;
-    UvRequest* recv;
-    bool close = false;
-} write_req_t;
+struct WriteContext {
+	uv_write_t req;
+	uv_buf_t buf;
+	Connection* conn;
+	bool close = false;
+};
 
 class UvOutputStream : public IOutputStream {
 public:
@@ -186,7 +190,29 @@ private:
 
     void (* cb_close_)(uv_handle_t* handle);
 
-    write_req_t* wr_ = nullptr;
+	WriteContext* wr_ = nullptr;
+};
+
+class StringView {
+public:
+	StringView(const char* data, ssize_t size);
+
+public:
+	const char* data;
+	size_t size;
+};
+
+class OweMem {
+public:
+	OweMem();
+
+	OweMem(const char* data, size_t size);
+
+	void to_uv_buf(uv_buf_t* cpy);
+
+public:
+	const char* data;
+	size_t size;
 };
 
 } // namespace enji

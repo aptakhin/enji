@@ -4,7 +4,7 @@
 
 namespace enji {
 
-class UvRequest;
+class Connection;
 
 struct ServerOptions {
     String host;
@@ -14,169 +14,113 @@ struct ServerOptions {
 
 typedef std::pair<String, String> Header;
 
-class HttpRequestHandler;
-
-class Request {
-public:
-    friend class UvRequest;
-
-    friend class HttpRequestHandler;
-
-    const String& url() const { return url_; }
-
-private:
-    String method_;
-    String url_;
-    bool url_ready_;
-
-    std::multimap<String, String> headers_;
-};
-
 class Response {
 public:
-    friend class UvRequest;
 
-    friend class HttpRequestHandler;
+	Response(Connection* conn);
 
-    Response() { }
+	void write(const char* data, size_t size);
 
-    Response(String&& buf) : buf_(buf) { }
+	void flush();
+
+	void close();
 
 private:
-    String buf_;
+	Connection* conn_;
+
+	String buf_;
 };
 
-struct Route {
+class EventLoop {
 public:
-    typedef std::function<Response(const Request&)> Func;
+	EventLoop(uv_stream_t* server);
 
-    Route(String&& path, Func func);
+	EventLoop(uv_stream_t* server, uv_loop_t* loop);
 
-//protected:
-public:
-    String method;
-    String name;
-    String path;
-    std::function<Response(const Request&)> func;
+	uv_loop_t* loop() const { return ~loop_; }
+
+	uv_stream_t* server() const { return server_; }
+
+	void run();
+
+protected:
+	ScopePtrExit<uv_loop_t> loop_;
+	uv_stream_t* server_;
+};
+
+enum RequestSignalType {
+	NONE,
+	WRITE,
+	INPUT_EOF,
+	CLOSE,
+	CLOSE_CONFIRMED,
+};
+
+struct SignalEvent {
+	Connection* conn;
+	OweMem buf;
+	RequestSignalType signal;
 };
 
 class Server {
 public:
-    class Handler;
-
-    friend class Handler;
-
     Server();
 
     Server(ServerOptions&& options);
 
-    ~Server();
+    virtual ~Server();
 
     void setup(ServerOptions&& options);
 
-    void add_route(Route&& route);
-
     void run();
 
+	friend class Connection;
+	friend void handleri(intptr_t in);
+
+	virtual void on_connection(int status);
+	virtual void on_loop();
+
+	EventLoop* event_loop() { return event_loop_.get(); }
+
+	void request_finished(Connection* pRequest);
+
+	void queue_write(Connection* conn, OweMem mem_block);
+	void queue_close(Connection* conn);
+
 protected:
-    Handler* handler_ = nullptr;
+	std::unique_ptr<EventLoop> event_loop_;
+
+	ScopePtrExit<uv_idle_t> on_loop_;
+
+	std::vector<std::shared_ptr<Connection>> connections_;
+
+	SafeQueue<SignalEvent> input_queue_;
+	SafeQueue<SignalEvent> output_queue_;
+
+	std::vector<std::thread> threads_;
+
+	size_t counter_ = 0;
 
     std::unique_ptr<uv_tcp_t> tcp_server_;
-
-    std::vector<Route> routes_;
 };
 
-struct ConnectionContext {
-    StdInputStream input;
-    StdOutputStream output;
-};
-
-class IRequestHandler {
+class IConnectionHandler {
 public:
-    virtual void handle(ConnectionContext context) = 0;
+    virtual void handle(const String& data, Response& response) = 0;
 
-    virtual const Request& request() const = 0;
-
-    virtual ~IRequestHandler() { }
+    virtual ~IConnectionHandler() { }
 };
 
-class UvProc {
+class Connection {
 public:
-    UvProc(uv_stream_t* server);
-
-    UvProc(uv_stream_t* server, uv_loop_t* loop);
-
-    uv_loop_t* loop() const { return ~loop_; }
-
-    uv_stream_t* server() const { return server_; }
-
-    void run();
-
-protected:
-    ScopePtrExit<uv_loop_t> loop_;
-    uv_stream_t* server_;
-};
-
-enum RequestSignalType {
-    NONE,
-    WRITE,
-    INPUT_EOF,
-    CLOSE,
-    CLOSE_CONFIRMED,
-};
-
-struct SignalEvent {
-    UvRequest* recv;
-    uv_buf_t buf;
-    RequestSignalType signal;
-};
-
-
-void handleri(intptr_t in);
-
-class Server::Handler {
-public:
-    friend class UvRequest;
-    friend void handleri(intptr_t in);
-
-    Handler(Server* parent, uv_tcp_t* server);
-
-    void run();
-
-    void on_connection(int status);
-    void on_loop();
-
-    Response find_route(const String& url, IRequestHandler* handler);
-
-    UvProc& proc() { return proc_; }
-
-    void request_finished(UvRequest* pRequest);
-
-protected:
-    Server* parent_;
-
-    UvProc proc_;
-
-    ScopePtrExit<uv_idle_t> on_loop_;
-
-    std::vector<std::shared_ptr<UvRequest>> requests_;
-
-    SafeQueue<SignalEvent> input_queue_;
-    SafeQueue<SignalEvent> output_queue_;
-
-    std::vector<std::thread> threads_;
-
-    size_t counter_ = 0;
-};
-
-class UvRequest {
-public:
-    friend void handleri(intptr_t in);
-    friend class Server::Handler;
-
-    UvRequest(Server::Handler* parent, IRequestHandler* handler, const UvProc* proc, size_t id);
+	Connection(Server* parent, size_t id);
 
     uv_stream_t* tcp() const { return stream_.get(); }
+
+	virtual void handle_input(StringView data) {}
+
+	void write_chunk(OweMem mem_block);
+	void close();
 
     void accept();
 
@@ -189,23 +133,22 @@ public:
 
     void notify_closed();
 
+	friend void handleri(intptr_t in);
+
+	uv_stream_t* sock() { return stream_.get(); }
+
 protected:
     std::ostream& log();
 
 protected:
-    Server::Handler* parent_;
-    IRequestHandler* handler_;
+    Server* base_parent_;
 
     std::unique_ptr<uv_stream_t> stream_;
-    const UvProc* proc_;
-
-    std::stringstream input_;
-    std::stringstream output_;
-    ConnectionContext ctx_;
 
     std::unique_ptr<char> handler_ctx_stack_;
 
     size_t id_;
+	bool is_closing_ = false;
 };
 
 } // namespace enji

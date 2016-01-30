@@ -7,7 +7,7 @@ int cb_http_message_begin(http_parser* parser) {
 }
 
 int cb_http_url(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
     return handler.on_http_url(at, len);
 }
 
@@ -17,27 +17,28 @@ int cb_http_status(http_parser* parser, const char* at, size_t len) {
 }
 
 int cb_http_header_field(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
     return handler.on_http_header_field(at, len);
 }
 
 int cb_http_header_value(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
     return handler.on_http_header_value(at, len);
 }
 
 int cb_http_headers_complete(http_parser* parser) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
     return handler.on_http_headers_complete();
 }
 
 int cb_http_body(http_parser* parser, const char* at, size_t len) {
-    HttpRequestHandler& handler = *reinterpret_cast<HttpRequestHandler*>(parser->data);
+    HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
     return handler.on_http_body();
 }
 
 int cb_http_message_complete(http_parser* parser) {
-    return 0;
+	HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
+	return handler.on_message_complete();
 }
 
 http_parser_settings& get_http_settings() {
@@ -53,68 +54,143 @@ http_parser_settings& get_http_settings() {
 	return http_settings;
 }
 
-HttpRequestHandler::HttpRequestHandler(Server::Handler* parent)
-    : parent_(parent) {
+HttpConnection::HttpConnection(HttpServer* parent, size_t id)
+:	Connection(parent, id),
+	parent_(parent) {
     parser_.reset(new http_parser);
     http_parser_init(parser_.get(), HTTP_REQUEST);
     parser_.get()->data = this;
 
-    request_.reset(new Request);
+	request_.reset(new HttpRequest{});
 }
 
-const Request& HttpRequestHandler::request() const {
+const HttpRequest& HttpConnection::request() const {
     return *request_.get();
 }
 
-int HttpRequestHandler::on_http_url(const char* at, size_t len) {
+int HttpConnection::on_http_url(const char* at, size_t len) {
     request_->url_ += String(at, len);
     return 0;
 }
 
-int HttpRequestHandler::on_http_header_field(const char* at, size_t len) {
+int HttpConnection::on_http_header_field(const char* at, size_t len) {
     check_header_finished();
     read_header_.first += String(at, len);
     return 0;
 }
 
-int HttpRequestHandler::on_http_header_value(const char* at, size_t len) {
+int HttpConnection::on_http_header_value(const char* at, size_t len) {
     read_header_.second += String(at, len);
     return 0;
 }
 
-int HttpRequestHandler::on_http_headers_complete() {
+int HttpConnection::on_http_headers_complete() {
     check_header_finished();
     return 0;
 }
 
-int HttpRequestHandler::on_http_body() {
+int HttpConnection::on_http_body() {
     return 0;
 }
 
-void HttpRequestHandler::handle(ConnectionContext context) {
-    char buf[1024];
-    while (!context.input.eof()) {
-        size_t read = context.input.read(buf, sizeof(buf));
-        http_parser_execute(parser_.get(), &get_http_settings(), buf, read);
-    }
-
-    /*
-     * std::future
-     */
-
-    request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
-
-    response_ = parent_->find_route(request_->url_, this);
-
-    context.output.write(&response_.buf_[0], response_.buf_.size());
+int HttpConnection::on_message_complete() {
+	message_completed_ = true;
+	return 0;
 }
 
-void HttpRequestHandler::check_header_finished() {
+void HttpConnection::handle_input(StringView data) {
+	std::cout << String(data.data, data.data + data.size);
+	http_parser_execute(parser_.get(), &get_http_settings(), data.data, data.size);
+	
+	if (message_completed_) {
+		std::cout << "Now parse it!\n";
+
+		request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
+
+		parent_->call_handler(*request_.get(), this);
+	}
+}
+
+//void HttpConnection::handle_input(const String& data) {
+//    char buf[1024];
+//    while (!context.input.eof()) {
+//        size_t read = context.input.read(buf, sizeof(buf));
+//        http_parser_execute(parser_.get(), &get_http_settings(), buf, read);
+//    }
+//
+//    /*
+//     * std::future
+//     */
+//
+//    request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
+//
+//    response_ = parent_->find_route(request_->url_, this);
+//
+//    context.output.write(&response_.buf_[0], response_.buf_.size());
+//}
+
+void HttpConnection::check_header_finished() {
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
         request_->headers_.insert(
             Header(std::move(read_header_.first), std::move(read_header_.second)));
     }
 }
 
+//Response Server::Handler::find_route(const String& url, IRequestHandler* handler) {
+//    
+//    return Response{};
+//}
+
+HttpOutput::HttpOutput(HttpConnection* conn)
+:	conn_(conn) {
+
+}
+
+HttpOutput& HttpOutput::header(const String& name, const String& value) {
+	return *this;
+}
+
+HttpOutput& HttpOutput::body(const String& value) {
+	if (!value.empty()) {
+		OweMem mem = {new char[value.length()], value.length() };
+		std::memcpy((void*)mem.data, &value.front(), value.length());
+		conn_->write_chunk(mem);
+	}
+	return *this;
+}
+
+void HttpOutput::close() {
+	conn_->close();
+}
+
+HttpRoute::HttpRoute(String&& path, Handler handler)
+:	path(path),
+	handler(handler) {
+}
+
+HttpServer::HttpServer(ServerOptions&& options)
+:	Server(std::move(options)) {
+}
+
+void HttpServer::on_connection(int status) {
+	auto new_connection = std::make_shared<HttpConnection>(this, counter_++);
+	new_connection->accept();
+	connections_.push_back(new_connection);
+}
+
+void HttpServer::add_route(HttpRoute&& route) {
+	routes_.emplace_back(route);
+}
+
+void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
+	for (auto&& route : routes_) {
+		//std::cout << "Url" << "_" << route.path << std::endl;
+		if (route.path == request.url()) {
+			HttpOutput out(bind);
+		    route.handler(request, out);
+			out.close();
+		}
+	}
+}
 
 } // namespace enji
