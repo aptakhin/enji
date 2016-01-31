@@ -99,7 +99,7 @@ private:
     HttpServer* parent_;
 
     std::unique_ptr<HttpRequest> request_;
-    //Response response_;
+
     std::unique_ptr<http_parser> parser_;
 
     typedef std::pair<String, String> RHeader;

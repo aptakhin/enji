@@ -7,7 +7,6 @@ void index(const HttpRequest& req, HttpOutput& out) {
     out.headers({
         { "Content-Type", "text/html; charset=utf-8" },
     });
-    //out.body("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\nHello, world!\n");
     out.body("Hello, world!\n");
 }
 

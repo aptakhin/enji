@@ -1,5 +1,5 @@
 
-Before `1.0` version backward compatibility can be broken even in feature releases.
+Before `1.0` version backward compatibility can be broken.
 
 ## 0.1
 First release as first checkpoint. Dependencies loading on 3 platforms and a few examples.
