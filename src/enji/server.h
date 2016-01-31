@@ -63,11 +63,10 @@ public:
 
     EventLoop* event_loop() { return event_loop_.get(); }
 
-    void request_finished(Connection* pRequest);
-
     void queue_read(Connection* conn, OweMem mem_block);
     void queue_write(Connection* conn, OweMem mem_block);
     void queue_close(Connection* conn);
+    void queue_confirmed_close(Connection* conn);
 
 protected:
     ServerOptions base_options_;
@@ -117,8 +116,6 @@ protected:
     Server* base_parent_;
 
     std::unique_ptr<uv_stream_t> stream_;
-
-    std::unique_ptr<char> handler_ctx_stack_;
 
     size_t id_;
     bool is_closing_ = false;

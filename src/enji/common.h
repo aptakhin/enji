@@ -158,4 +158,21 @@ public:
     size_t size;
 };
 
+
+template <typename Exc>
+void uvcheck(int resp_code, String& enji_error, const char* file, int line) {
+    if (resp_code != 0) {
+        std::ostringstream err;
+        err << enji_error << " (uv code: " << resp_code << ", str: " << uv_strerror(resp_code) << ")";
+        throw Exc(err.str());
+    }
+}
+
+template <typename Exc>
+void uvcheck(int resp_code, const char* enji_error, const char* file, int line) {
+    uvcheck<Exc>(resp_code, String(enji_error), file, line);
+}
+
+#define UVCHECK(resp_code, exc, enji_error) { uvcheck<exc>((resp_code), (enji_error), __FILE__, __LINE__); }
+
 } // namespace enji
