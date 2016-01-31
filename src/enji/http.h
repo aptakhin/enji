@@ -6,8 +6,6 @@
 
 namespace enji {
 
-class HttpOutput;
-
 class HttpRequest {
 public:
     friend class HttpConnection;

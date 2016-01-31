@@ -14,23 +14,6 @@ struct ServerOptions {
 
 typedef std::pair<String, String> Header;
 
-class Response {
-public:
-
-    Response(Connection* conn);
-
-    void write(const char* data, size_t size);
-
-    void flush();
-
-    void close();
-
-private:
-    Connection* conn_;
-
-    String buf_;
-};
-
 class EventLoop {
 public:
     EventLoop(uv_stream_t* server);
@@ -73,9 +56,6 @@ public:
 
     void run();
 
-    friend class Connection;
-    friend void handleri(intptr_t in);
-
     virtual void on_connection(int status);
     virtual void on_loop();
 
@@ -106,18 +86,9 @@ protected:
     std::unique_ptr<uv_tcp_t> tcp_server_;
 };
 
-class IConnectionHandler {
-public:
-    virtual void handle(const String& data, Response& response) = 0;
-
-    virtual ~IConnectionHandler() { }
-};
-
 class Connection {
 public:
     Connection(Server* parent, size_t id);
-
-    uv_stream_t* tcp() const { return stream_.get(); }
 
     virtual void handle_input(StringView data) {}
 
@@ -131,11 +102,7 @@ public:
     void on_after_write(uv_write_t* req, int status);
     void on_after_shutdown(uv_shutdown_t* shutdown, int status);
 
-    void handle_event(SignalEvent&& event);
-
     void notify_closed();
-
-    friend void handleri(intptr_t in);
 
     uv_stream_t* sock() { return stream_.get(); }
 
