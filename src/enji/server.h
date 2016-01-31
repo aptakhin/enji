@@ -56,6 +56,8 @@ public:
 
     void run();
 
+    void create_connection(std::function<std::shared_ptr<Connection>()>);
+
     virtual void on_connection(int status);
     virtual void on_loop();
 
@@ -84,6 +86,8 @@ protected:
     size_t counter_ = 0;
 
     std::unique_ptr<uv_tcp_t> tcp_server_;
+
+    std::function<std::shared_ptr<Connection>()> create_connection_;
 };
 
 class Connection {

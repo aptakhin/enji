@@ -116,24 +116,60 @@ void HttpConnection::check_header_finished() {
 }
 
 HttpOutput::HttpOutput(HttpConnection* conn)
-:   conn_(conn) {
-
+:   conn_(conn),
+    response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
+    headers_(std::stringstream::in | std::stringstream::out | std::stringstream::binary), 
+    body_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
 }
 
-HttpOutput& HttpOutput::header(const String& name, const String& value) {
+HttpOutput::~HttpOutput() {
+    close();
+}
+
+HttpOutput& HttpOutput::response(int code) {
+    response_ << "HTTP/1.1 " << code << "\r\n";
+
+    body_ << "\r\n";
     return *this;
 }
 
-HttpOutput& HttpOutput::body(const String& value) {
-    if (!value.empty()) {
-        OweMem mem = {new char[value.length()], value.length() };
-        std::memcpy((void*)mem.data, &value.front(), value.length());
-        conn_->write_chunk(mem);
+HttpOutput& HttpOutput::headers(std::vector<std::pair<String, String>> headers) {
+    for (auto&& h : headers) {
+        header(h.first, h.second);
     }
     return *this;
 }
 
+HttpOutput& HttpOutput::header(const String& name, const String& value) {
+    headers_ << name << ": " << value << "\r\n";
+    return *this;
+}
+
+HttpOutput& HttpOutput::body(const String& value) {
+    body_ << value;
+    return *this;
+}
+
+void stream2conn(Connection* conn, std::stringstream& buf) {
+    auto write_bytes = buf.rdbuf()->in_avail();
+    if (write_bytes) {
+        size_t alloc_block = 4096;
+        char* data = new char[alloc_block];
+        buf.read(data, alloc_block);
+        size_t size = buf.gcount();
+        OweMem mem = { data, size };
+        conn->write_chunk(mem);
+    }
+}
+
+void HttpOutput::flush() {
+    stream2conn(conn_, response_);
+    stream2conn(conn_, headers_);
+    stream2conn(conn_, body_);
+}
+
 void HttpOutput::close() {
+    flush();
     conn_->close();
 }
 
@@ -150,6 +186,10 @@ void HttpServer::on_connection(int status) {
     auto new_connection = std::make_shared<HttpConnection>(this, counter_++);
     new_connection->accept();
     connections_.push_back(new_connection);
+}
+
+void HttpServer::routes(std::vector<HttpRoute>&& routes) {
+    routes_ = std::move(routes);
 }
 
 void HttpServer::add_route(HttpRoute&& route) {

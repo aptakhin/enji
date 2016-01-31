@@ -86,8 +86,12 @@ void Server::run() {
     event_loop_->run();
 }
 
+void Server::create_connection(std::function<std::shared_ptr<Connection>()> create) {
+    create_connection_ = create;
+}
+
 void Server::on_connection(int status) {
-    auto new_connection = std::make_shared<Connection>(this, counter_++);
+    auto new_connection = create_connection_();
     new_connection->accept();
     connections_.push_back(new_connection);
 }

@@ -19,5 +19,7 @@ add_library(
 )
 
 add_executable(enjitests tests/test.cpp deps/src/gtest/gtest-all.cc)
+add_executable(pingpong examples/pingpong.cpp)
 
 target_link_libraries(enjitests enji ${ENJI_LIBS})
+target_link_libraries(pingpong enji ${ENJI_LIBS})

@@ -27,14 +27,22 @@ private:
 class HttpOutput {
 public:
     HttpOutput(HttpConnection* conn);
+    ~HttpOutput();
 
+    HttpOutput& response(int code=200);
+    HttpOutput& headers(std::vector<std::pair<String, String>> headers);
     HttpOutput& header(const String& name, const String& value);
     HttpOutput& body(const String& value);
 
+    void flush();
     void close();
 
 private:
     HttpConnection* conn_;
+
+    std::stringstream response_;
+    std::stringstream headers_;
+    std::stringstream body_;
 };
 
 struct HttpRoute {
@@ -57,6 +65,7 @@ public:
 
     void on_connection(int status) override;
 
+    void routes(std::vector<HttpRoute>&& routes);
     void add_route(HttpRoute&& route);
 
     void call_handler(const HttpRequest& request, HttpConnection* bind);
