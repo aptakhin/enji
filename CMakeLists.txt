@@ -7,7 +7,7 @@ include_directories(deps/include)
 find_library(LIBUV_LIBRARY libuv deps/lib)
 find_library(GTEST_LIBRARY gtest deps/lib)
 
-set(ENJI_LIBS Ws2_32.lib Iphlpapi.lib psapi.lib userenv.lib  ${LIBUV_LIBRARY} ${MSGPACK_LIBRARY})
+set(ENJI_LIBS Ws2_32.lib Iphlpapi.lib psapi.lib userenv.lib  ${LIBUV_LIBRARY})
 
 set(ENJI_HEADERS src/enji/common.h src/enji/http.h src/enji/server.h)
 set(ENJI_SOURCES src/enji/common.cpp src/enji/http.cpp src/enji/server.cpp deps/src/http_parser.c)

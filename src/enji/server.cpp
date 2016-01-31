@@ -1,5 +1,4 @@
 #include "server.h"
-#include "http.h"
 
 namespace enji {
 
