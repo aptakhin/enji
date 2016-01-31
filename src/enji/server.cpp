@@ -90,38 +90,35 @@ void Server::on_connection(int status) {
 
 void Server::on_loop() {
     SignalEvent msg;
-    while (true) {
-        if (output_queue_.pop(msg)) {
-            if (msg.signal == RequestSignalType::WRITE || msg.signal == RequestSignalType::CLOSE) {
-                auto wr = new WriteContext{};
-                wr->conn = msg.conn;
-                msg.buf.to_uv_buf(&wr->buf);
-                wr->req.data = wr->conn;
-                if (msg.signal == RequestSignalType::CLOSE) {
-                    wr->close = true;
-                }
-                UVCHECK(uv_write(&wr->req, msg.conn->sock(), &wr->buf, 1, cb_after_write),
-                    std::runtime_error, "Can't write data");
+    while (output_queue_.pop(msg)) {
+        if (msg.signal == RequestSignalType::WRITE || msg.signal == RequestSignalType::CLOSE) {
+            auto wr = new WriteContext{};
+            wr->conn = msg.conn;
+            msg.buf.to_uv_buf(&wr->buf);
+            wr->req.data = wr->conn;
+            if (msg.signal == RequestSignalType::CLOSE) {
+                wr->close = true;
             }
-            else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
-                Connection* remove_conn = msg.conn;
-                auto found = std::find_if(connections_.begin(), connections_.end(),
-                    [remove_conn](std::shared_ptr<Connection> req) {
-                    return req.get() == remove_conn; });
-                /*connections_.erase(found);*/
-            }
+            UVCHECK(uv_write(&wr->req, msg.conn->sock(), &wr->buf, 1, cb_after_write),
+                std::runtime_error, "Can't write data");
         }
-        if (output_queue_.empty())
-            break;
+        else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
+            Connection* remove_conn = msg.conn;
+            auto found = std::find_if(connections_.begin(), connections_.end(),
+                [remove_conn](std::shared_ptr<Connection> req) {
+                return req.get() == remove_conn; });
+            /*connections_.erase(found);*/
+        }
     }
 }
 
 void Server::queue_read(Connection* conn, OweMem mem_block) {
     if (base_options_.worker_threads == 1) {
         conn->handle_input(StringView{ mem_block.data, ssize_t(mem_block.size) });
+        delete[] mem_block.data;
     }
     else {
-        output_queue_.push(SignalEvent{ conn, mem_block, READ });
+        input_queue_.push(SignalEvent{ conn, mem_block, READ });
         //or
         //uv_queue_work(proc_->loop(), work_req, on_work_cb, on_after_work_cb);
     }
@@ -142,7 +139,8 @@ void Server::queue_confirmed_close(Connection* conn) {
 EventLoop::EventLoop(uv_stream_t* server)
 :   server_(server) {
     uv_loop_t* loop = new uv_loop_t;
-    uv_loop_init(loop);
+    UVCHECK(uv_loop_init(loop),
+        std::runtime_error, "Can't init event loop");
     loop_.reset(loop, [](uv_loop_t* loop) {
         uv_loop_close(loop);
         delete loop;
@@ -204,7 +202,6 @@ void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     if (nread > 0) {
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
         base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
-        delete[] buf->base;
     }
 
     if (nread <= 0) {
