@@ -106,7 +106,7 @@ void Server::on_loop() {
             Connection* remove_conn = msg.conn;
             auto found = std::find_if(connections_.begin(), connections_.end(),
                 [remove_conn](std::shared_ptr<Connection> req) {
-                return req.get() == remove_conn; });
+                    return req.get() == remove_conn; });
             connections_.erase(found);
         }
     }
@@ -244,6 +244,7 @@ void Connection::on_after_write(uv_write_t* req, int status) {
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
 
+    delete[] write_result->buf.base;
     delete write_result;
 }
 

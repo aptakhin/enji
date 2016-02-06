@@ -45,6 +45,8 @@ private:
     std::stringstream response_;
     std::stringstream headers_;
     std::stringstream body_;
+
+    std::stringstream full_response_;
 };
 
 struct HttpRoute {

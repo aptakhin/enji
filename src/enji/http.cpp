@@ -150,6 +150,16 @@ HttpOutput& HttpOutput::body(const String& value) {
     return *this;
 }
 
+void stream2stream(std::stringstream& output, std::stringstream& input) {
+    const size_t alloc_block = 4096;
+    char tmp[alloc_block];
+    while (input) {
+        input.read(tmp, sizeof(tmp));
+        size_t size = input.gcount();
+        output.write(tmp, size);
+    }
+}
+
 void stream2conn(Connection* conn, std::stringstream& buf) {
     while (buf) {
         size_t alloc_block = 4096;
@@ -162,9 +172,11 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
 }
 
 void HttpOutput::flush() {
-    stream2conn(conn_, response_);
-    stream2conn(conn_, headers_);
-    stream2conn(conn_, body_);
+    stream2stream(full_response_, response_);
+    stream2stream(full_response_, headers_);
+    stream2stream(full_response_, body_);
+    
+    stream2conn(conn_, full_response_);
 }
 
 void HttpOutput::close() {
