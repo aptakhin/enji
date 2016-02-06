@@ -119,7 +119,8 @@ HttpOutput::HttpOutput(HttpConnection* conn)
 :   conn_(conn),
     response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
     headers_(std::stringstream::in | std::stringstream::out | std::stringstream::binary), 
-    body_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
+    body_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
+    full_response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
 }
 
 HttpOutput::~HttpOutput() {
@@ -128,8 +129,6 @@ HttpOutput::~HttpOutput() {
 
 HttpOutput& HttpOutput::response(int code) {
     response_ << "HTTP/1.1 " << code << "\r\n";
-
-    body_ << "\r\n";
     return *this;
 }
 
@@ -150,14 +149,19 @@ HttpOutput& HttpOutput::body(const String& value) {
     return *this;
 }
 
-void stream2stream(std::stringstream& output, std::stringstream& input) {
+bool stream2stream(std::stringstream& output, std::stringstream& input) {
     const size_t alloc_block = 4096;
     char tmp[alloc_block];
+    bool written_smth = false;
     while (input) {
         input.read(tmp, sizeof(tmp));
         size_t size = input.gcount();
         output.write(tmp, size);
+        if (size) {
+            written_smth = true;
+        }
     }
+    return written_smth;
 }
 
 void stream2conn(Connection* conn, std::stringstream& buf) {
@@ -172,8 +176,20 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
 }
 
 void HttpOutput::flush() {
-    stream2stream(full_response_, response_);
+    if (!stream2stream(full_response_, response_)) {
+        full_response_ << "HTTP/1.1 200\r\n";
+    }
+    
+    body_.seekp(0, std::ios::end);
+    auto body_size = body_.tellp();
+
+    std::ostringstream body_size_stream;
+    body_size_stream << body_size;
+    add_header("Content-length", body_size_stream.str());
+
     stream2stream(full_response_, headers_);
+
+    full_response_ << "\r\n";
     stream2stream(full_response_, body_);
     
     stream2conn(conn_, full_response_);

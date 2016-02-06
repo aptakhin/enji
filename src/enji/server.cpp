@@ -228,7 +228,8 @@ void Connection::on_after_write(uv_write_t* req, int status) {
     auto write_result = reinterpret_cast<WriteContext*>(req);
     req->handle->data = write_result->conn;
 
-    log() << "status: " << status << "\n";
+    UVCHECK(status,
+        std::runtime_error, "Bad status of write operation");
 
 //    if (status == 0)
 //        return;
