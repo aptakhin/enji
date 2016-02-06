@@ -66,8 +66,6 @@ class HttpServer : public Server {
 public:
     HttpServer(ServerOptions&& options);
 
-    void on_connection(int status) override;
-
     void routes(std::vector<HttpRoute>&& routes);
     void add_route(HttpRoute&& route);
 

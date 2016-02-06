@@ -151,8 +151,7 @@ HttpOutput& HttpOutput::body(const String& value) {
 }
 
 void stream2conn(Connection* conn, std::stringstream& buf) {
-    auto write_bytes = buf.rdbuf()->in_avail();
-    if (write_bytes) {
+    while (buf) {
         size_t alloc_block = 4096;
         char* data = new char[alloc_block];
         buf.read(data, alloc_block);
@@ -185,12 +184,7 @@ HttpRoute::HttpRoute(String&& path, Handler handler)
 
 HttpServer::HttpServer(ServerOptions&& options)
 :   Server(std::move(options)) {
-}
-
-void HttpServer::on_connection(int status) {
-    auto new_connection = std::make_shared<HttpConnection>(this, counter_++);
-    new_connection->accept();
-    connections_.push_back(new_connection);
+    create_connection([this]() { return std::make_shared<HttpConnection>(this, counter_++); });
 }
 
 void HttpServer::routes(std::vector<HttpRoute>&& routes) {
