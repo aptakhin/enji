@@ -118,6 +118,7 @@ protected:
     std::unique_ptr<uv_stream_t> stream_;
 
     size_t id_;
+
     bool is_closing_ = false;
 };
 

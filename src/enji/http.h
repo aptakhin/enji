@@ -32,8 +32,8 @@ public:
     ~HttpOutput();
 
     HttpOutput& response(int code=200);
-    HttpOutput& headers(std::vector<std::pair<String, String>> headers);
-    HttpOutput& header(const String& name, const String& value);
+    HttpOutput& add_headers(std::vector<std::pair<String, String>> headers);
+    HttpOutput& add_header(const String& name, const String& value);
     HttpOutput& body(const String& value);
 
     void flush();
@@ -68,6 +68,8 @@ public:
 
     void routes(std::vector<HttpRoute>&& routes);
     void add_route(HttpRoute&& route);
+    std::vector<HttpRoute>& routes() { return routes_; }
+    const std::vector<HttpRoute>& routes() const { return routes_; }
 
     void call_handler(const HttpRequest& request, HttpConnection* bind);
 

@@ -133,14 +133,14 @@ HttpOutput& HttpOutput::response(int code) {
     return *this;
 }
 
-HttpOutput& HttpOutput::headers(std::vector<std::pair<String, String>> headers) {
+HttpOutput& HttpOutput::add_headers(std::vector<std::pair<String, String>> headers) {
     for (auto&& h : headers) {
-        header(h.first, h.second);
+        add_header(h.first, h.second);
     }
     return *this;
 }
 
-HttpOutput& HttpOutput::header(const String& name, const String& value) {
+HttpOutput& HttpOutput::add_header(const String& name, const String& value) {
     headers_ << name << ": " << value << "\r\n";
     return *this;
 }
@@ -184,7 +184,8 @@ HttpRoute::HttpRoute(String&& path, Handler handler)
 
 HttpServer::HttpServer(ServerOptions&& options)
 :   Server(std::move(options)) {
-    create_connection([this]() { return std::make_shared<HttpConnection>(this, counter_++); });
+    create_connection([this]() {
+        return std::make_shared<HttpConnection>(this, counter_++); });
 }
 
 void HttpServer::routes(std::vector<HttpRoute>&& routes) {

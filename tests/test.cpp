@@ -4,7 +4,7 @@ using namespace enji;
 
 void index(const HttpRequest& req, HttpOutput& out) {
     out.response();
-    out.headers({
+    out.add_headers({
         { "Content-Type", "text/html; charset=utf-8" },
     });
     out.body("Hello, world!\n");
