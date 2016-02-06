@@ -34,7 +34,7 @@ void cb_after_shutdown(uv_shutdown_t* shutdown, int status) {
 void cb_alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
     //std::cout << "Callback alloc " << suggested_size << std::endl;
     buf->base = new char[suggested_size];
-    buf->len = ULONG(suggested_size);
+    buf->len = size_t(suggested_size);
 }
 
 void cb_after_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {

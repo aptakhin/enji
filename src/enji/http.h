@@ -6,6 +6,8 @@
 
 namespace enji {
 
+class HttpConnection;
+
 class HttpRequest {
 public:
     friend class HttpConnection;
@@ -49,6 +51,7 @@ struct HttpRoute {
 public:
     typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
 
+    HttpRoute(const char* path, Handler handler);
     HttpRoute(String&& path, Handler handler);
 
     //protected:

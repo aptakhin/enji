@@ -173,6 +173,11 @@ void HttpOutput::close() {
     conn_->close();
 }
 
+HttpRoute::HttpRoute(const char* path, Handler handler)
+:   path(path),
+    handler(handler) {
+}
+
 HttpRoute::HttpRoute(String&& path, Handler handler)
 :   path(path),
     handler(handler) {

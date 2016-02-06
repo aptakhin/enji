@@ -30,7 +30,7 @@ OweMem::OweMem(const char* data, size_t size)
 
 void OweMem::to_uv_buf(uv_buf_t* cpy) {
     cpy->base = (char*) data;
-    cpy->len = ULONG(size);
+    cpy->len = size_t(size);
 }
 
 } // namespace enji

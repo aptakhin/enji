@@ -160,7 +160,7 @@ public:
 
 
 template <typename Exc>
-void uvcheck(int resp_code, String& enji_error, const char* file, int line) {
+void uvcheck(int resp_code, String&& enji_error, const char* file, int line) {
     if (resp_code != 0) {
         std::ostringstream err;
         err << enji_error << " (uv code: " << resp_code << ", str: " << uv_strerror(resp_code) << ")";
