@@ -107,7 +107,7 @@ void Server::on_loop() {
             auto found = std::find_if(connections_.begin(), connections_.end(),
                 [remove_conn](std::shared_ptr<Connection> req) {
                 return req.get() == remove_conn; });
-            /*connections_.erase(found);*/
+            connections_.erase(found);
         }
     }
 }
@@ -225,8 +225,8 @@ void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
 }
 
 void Connection::on_after_write(uv_write_t* req, int status) {
-    auto wr = reinterpret_cast<WriteContext*>(req);
-    req->handle->data = wr->conn;
+    auto write_result = reinterpret_cast<WriteContext*>(req);
+    req->handle->data = write_result->conn;
 
     log() << "status: " << status << "\n";
 
@@ -239,27 +239,27 @@ void Connection::on_after_write(uv_write_t* req, int status) {
 //        return;
 //
 //    assert(status == UV_EPIPE);
-    if (wr->close) {
+    if (write_result->close) {
         log() << "close" << "\n";
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
 
-    delete wr;
+    delete write_result;
 }
 
 void Connection::on_after_shutdown(uv_shutdown_t* shutdown, int status) {
-    /*assert(status == 0);*/
+    UVCHECK(status,
+        std::runtime_error, "Bad status of shutdown operation");
     if (status < 0) {
         log() << "err " << uv_strerror(status) << "\n";
     }
 
     uv_close((uv_handle_t*) shutdown->handle, cb_close);
     delete shutdown;
-
-    base_parent_->queue_confirmed_close(this);
 }
 
 void Connection::notify_closed() {
+    stream_.release();
     base_parent_->queue_confirmed_close(this);
 }
 
