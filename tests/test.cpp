@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     opts.port = 3001;
     HttpServer server(std::move(opts));
     server.routes({ 
-        { "/", [] (const enji::HttpRequest& req, enji::HttpOutput& out) { return index(req, out); } },
+        { "/", index },
     });
     server.run();
     return 0;

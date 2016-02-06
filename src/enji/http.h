@@ -51,10 +51,14 @@ private:
 
 struct HttpRoute {
 public:
+    typedef void (*FuncHandler)(const HttpRequest&, HttpOutput&);
     typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
 
     HttpRoute(const char* path, Handler handler);
     HttpRoute(String&& path, Handler handler);
+
+    HttpRoute(const char* path, FuncHandler handler);
+    HttpRoute(String&& path, FuncHandler handler);
 
     //protected:
 public:

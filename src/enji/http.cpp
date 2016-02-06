@@ -194,6 +194,16 @@ HttpRoute::HttpRoute(String&& path, Handler handler)
     handler(handler) {
 }
 
+HttpRoute::HttpRoute(const char* path, FuncHandler handler)
+:   path(path),
+    handler(handler) {
+}
+
+HttpRoute::HttpRoute(String&& path, FuncHandler handler)
+:   path(path),
+    handler(handler) {
+}
+
 HttpServer::HttpServer(ServerOptions&& options)
 :   Server(std::move(options)) {
     create_connection([this]() {
