@@ -65,7 +65,7 @@ void Server::setup(ServerOptions&& opts) {
         std::runtime_error, "Can't listen tcp port");
 }
 
-void idle_cb(uv_idle_t* handle);
+void cb_idle(uv_idle_t* handle);
 
 void Server::run() {
     uv_idle_t* on_loop = new uv_idle_t;
@@ -73,7 +73,7 @@ void Server::run() {
         std::runtime_error, "Can't init loop events handling");
     on_loop->data = this;
     on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
-    uv_idle_start(on_loop, idle_cb);
+    uv_idle_start(on_loop, cb_idle);
 
     event_loop_->run();
 }
@@ -183,7 +183,7 @@ void Connection::accept() {
         std::runtime_error, "Can't start read");
 }
 
-void idle_cb(uv_idle_t* handle) {
+void cb_idle(uv_idle_t* handle) {
     Server& that = *reinterpret_cast<Server*>(handle->data);
     that.on_loop();
 }
