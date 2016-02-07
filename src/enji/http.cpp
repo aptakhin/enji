@@ -140,6 +140,9 @@ HttpOutput& HttpOutput::add_headers(std::vector<std::pair<String, String>> heade
 }
 
 HttpOutput& HttpOutput::add_header(const String& name, const String& value) {
+    if (headers_sent_) {
+        throw std::runtime_error("Can add headers to response. Headers already sent");
+    }
     headers_ << name << ": " << value << "\r\n";
     return *this;
 }
@@ -176,22 +179,25 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
 }
 
 void HttpOutput::flush() {
-    if (!stream2stream(full_response_, response_)) {
-        full_response_ << "HTTP/1.1 200\r\n";
+    if (!headers_sent_) {
+        if (!stream2stream(full_response_, response_)) {
+            full_response_ << "HTTP/1.1 200\r\n";
+        }
+
+        body_.seekp(0, std::ios::end);
+        auto body_size = body_.tellp();
+
+        std::ostringstream body_size_stream;
+        body_size_stream << body_size;
+        add_header("Content-length", body_size_stream.str());
+
+        stream2stream(full_response_, headers_);
+        headers_sent_ = true;
+
+        full_response_ << "\r\n";
     }
-    
-    body_.seekp(0, std::ios::end);
-    auto body_size = body_.tellp();
 
-    std::ostringstream body_size_stream;
-    body_size_stream << body_size;
-    add_header("Content-length", body_size_stream.str());
-
-    stream2stream(full_response_, headers_);
-
-    full_response_ << "\r\n";
     stream2stream(full_response_, body_);
-    
     stream2conn(conn_, full_response_);
 }
 
@@ -234,9 +240,13 @@ void HttpServer::add_route(HttpRoute&& route) {
     routes_.emplace_back(route);
 }
 
+bool route_matches(const HttpRequest& request, const HttpRoute& route) {
+    return route.path == request.url();
+}
+
 void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
-        if (route.path == request.url()) {
+        if (route_matches(request, route)) {
             HttpOutput out(bind);
             route.handler(request, out);
             out.close();
