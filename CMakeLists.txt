@@ -8,7 +8,14 @@ endif()
 include_directories(src)
 include_directories(deps/include)
 
-find_library(LIBUV_LIBRARY libuv deps/lib)
+find_library(LIBUV_LIBRARY_DEBUG libuv deps/lib/debug)
+find_library(LIBUV_LIBRARY_RELEASE libuv deps/lib/release)
+
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+    set(LIBUV_LIBRARY ${LIBUV_LIBRARY_DEBUG})
+else()
+	set(LIBUV_LIBRARY ${LIBUV_LIBRARY_RELEASE})
+endif()
 
 if (MSVC)
     set(ENJI_LIBS Ws2_32.lib Iphlpapi.lib psapi.lib userenv.lib ${LIBUV_LIBRARY})

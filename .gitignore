@@ -3,3 +3,4 @@ deps
 .idea
 *.exe
 docs/_sphinx
+*.zip
