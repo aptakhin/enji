@@ -14,7 +14,7 @@ find_library(LIBUV_LIBRARY_RELEASE libuv deps/lib/release)
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     set(LIBUV_LIBRARY ${LIBUV_LIBRARY_DEBUG})
 else()
-	set(LIBUV_LIBRARY ${LIBUV_LIBRARY_RELEASE})
+    set(LIBUV_LIBRARY ${LIBUV_LIBRARY_RELEASE})
 endif()
 
 if (MSVC)

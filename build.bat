@@ -3,6 +3,7 @@
 set enji_dir=%~dp0
 
 echo if not exist "%enji_dir%enji-deps-0.0.0.zip"
+
 if not exist "%enji_dir%enji-deps-0.0.0.zip" (
     powershell -Command "Invoke-WebRequest https://github.com/aptakhin/enji/releases/download/0.0.0/enji-deps-0.0.0.zip -OutFile enji-deps-0.0.0.zip"
 )
@@ -11,15 +12,6 @@ if not exist "%enji_dir%enji-deps-0.0.0.zip" (
 rem
 rem Copypaste of settings from deps\packages\libuv-1.8.0\vcbuild.bat
 rem
-
-if /i "%1"=="help" goto help
-if /i "%1"=="--help" goto help
-if /i "%1"=="-help" goto help
-if /i "%1"=="/help" goto help
-if /i "%1"=="?" goto help
-if /i "%1"=="-?" goto help
-if /i "%1"=="--?" goto help
-if /i "%1"=="/?" goto help
 
 @rem Process arguments.
 set config=
