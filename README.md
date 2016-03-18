@@ -7,11 +7,11 @@ Simple native building on Unix **TODO**:
 
 Or on Windows:
 
-    build.bat # Download and build libuv
+    build.bat
 
-    mkdir build # Folder for CMake-generated projects
+    mkdir build
     cd build
-    cmake -G "Visual Studio 14 Win64" .. # No additional configuration parameters
+    cmake -G "Visual Studio 14 Win64" ..
 
 Goal is to support 3 platforms: Linux, Mac, Windows. And compilers: Clang, GCC, MSVC.
 
