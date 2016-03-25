@@ -207,27 +207,27 @@ void HttpResponse::close() {
 }
 
 HttpRoute::HttpRoute(const char* path, Handler handler)
-:   path(path),
-    handler(handler) {
+:   path{path},
+    handler{handler} {
 }
 
 HttpRoute::HttpRoute(String&& path, Handler handler)
-:   path(path),
-    handler(handler) {
+:   path{path},
+    handler{handler} {
 }
 
 HttpRoute::HttpRoute(const char* path, FuncHandler handler)
-:   path(path),
-    handler(handler) {
+:   path{path},
+    handler{handler} {
 }
 
 HttpRoute::HttpRoute(String&& path, FuncHandler handler)
-:   path(path),
-    handler(handler) {
+:   path{path},
+    handler{handler} {
 }
 
 HttpServer::HttpServer(ServerOptions&& options)
-:   Server(std::move(options)) {
+:   Server{std::move(options)} {
     create_connection([this]() {
         return std::make_shared<HttpConnection>(this, counter_++); });
 }
