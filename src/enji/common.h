@@ -86,12 +86,12 @@ template<typename T>
 class SafeQueue {
 public:
     void push(T&& value) {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         queue_.emplace(value);
     }
 
     bool pop(T& obj) {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         if (queue_.empty())
             return false;
         obj = std::move(queue_.front());
@@ -100,7 +100,7 @@ public:
     }
 
     bool empty() const {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         return queue_.empty();
     }
 

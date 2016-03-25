@@ -57,7 +57,7 @@ http_parser_settings& get_http_settings() {
 HttpConnection::HttpConnection(HttpServer* parent, size_t id)
 :   Connection(parent, id),
     parent_(parent) {
-    parser_.reset(new http_parser);
+    parser_.reset(new http_parser{});
     http_parser_init(parser_.get(), HTTP_REQUEST);
     parser_.get()->data = this;
 
@@ -69,18 +69,18 @@ const HttpRequest& HttpConnection::request() const {
 }
 
 int HttpConnection::on_http_url(const char* at, size_t len) {
-    request_->url_ += String(at, len);
+    request_->url_ += String{at, len};
     return 0;
 }
 
 int HttpConnection::on_http_header_field(const char* at, size_t len) {
     check_header_finished();
-    read_header_.first += String(at, len);
+    read_header_.first += String{at, len};
     return 0;
 }
 
 int HttpConnection::on_http_header_value(const char* at, size_t len) {
-    read_header_.second += String(at, len);
+    read_header_.second += String{at, len};
     return 0;
 }
 
@@ -111,16 +111,16 @@ void HttpConnection::handle_input(StringView data) {
 void HttpConnection::check_header_finished() {
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
         request_->headers_.insert(
-            Header(std::move(read_header_.first), std::move(read_header_.second)));
+            Header{std::move(read_header_.first), std::move(read_header_.second)});
     }
 }
 
 HttpResponse::HttpResponse(HttpConnection* conn)
-:   conn_(conn),
-    response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
-    headers_(std::stringstream::in | std::stringstream::out | std::stringstream::binary), 
-    body_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
-    full_response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
+:   conn_{conn},
+    response_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    headers_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    body_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    full_response_{std::stringstream::in | std::stringstream::out | std::stringstream::binary} {
 }
 
 HttpResponse::~HttpResponse() {
@@ -141,7 +141,7 @@ HttpResponse& HttpResponse::add_headers(std::vector<std::pair<String, String>> h
 
 HttpResponse& HttpResponse::add_header(const String& name, const String& value) {
     if (headers_sent_) {
-        throw std::runtime_error("Can add headers to response. Headers already sent");
+        throw std::runtime_error("Can't add headers to response. Headers already sent");
     }
     headers_ << name << ": " << value << "\r\n";
     return *this;
@@ -173,7 +173,7 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
         char* data = new char[alloc_block];
         buf.read(data, alloc_block);
         size_t size = buf.gcount();
-        OweMem mem = { data, size };
+        OweMem mem = {data, size};
         conn->write_chunk(mem);
     }
 }
@@ -247,7 +247,7 @@ bool route_matches(const HttpRequest& request, const HttpRoute& route) {
 void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
         if (route_matches(request, route)) {
-            HttpResponse out(bind);
+            HttpResponse out{bind};
             route.handler(request, out);
             out.close();
         }

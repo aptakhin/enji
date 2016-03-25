@@ -114,30 +114,30 @@ void Server::on_loop() {
 
 void Server::queue_read(Connection* conn, OweMem mem_block) {
     if (base_options_.worker_threads == 1) {
-        conn->handle_input(StringView{ mem_block.data, ssize_t(mem_block.size) });
+        conn->handle_input(StringView{mem_block.data, ssize_t(mem_block.size)});
         delete[] mem_block.data;
     }
     else {
-        input_queue_.push(SignalEvent{ conn, mem_block, READ });
+        input_queue_.push(SignalEvent{conn, mem_block, READ});
         //or
         //uv_queue_work(proc_->loop(), work_req, on_work_cb, on_after_work_cb);
     }
 }
 
 void Server::queue_write(Connection* conn, OweMem mem_block) {
-    output_queue_.push(SignalEvent{ conn, mem_block, WRITE });
+    output_queue_.push(SignalEvent{conn, mem_block, WRITE});
 }
 
 void Server::queue_close(Connection* conn) {
-    output_queue_.push(SignalEvent{ conn, OweMem{}, CLOSE });
+    output_queue_.push(SignalEvent{conn, OweMem{}, CLOSE});
 }
 
 void Server::queue_confirmed_close(Connection* conn) {
-    output_queue_.push(SignalEvent{ conn, OweMem{}, RequestSignalType::CLOSE_CONFIRMED });
+    output_queue_.push(SignalEvent{conn, OweMem{}, RequestSignalType::CLOSE_CONFIRMED});
 }
 
 EventLoop::EventLoop(uv_stream_t* server)
-:   server_(server) {
+:   server_{server} {
     uv_loop_t* loop = new uv_loop_t;
     UVCHECK(uv_loop_init(loop),
         std::runtime_error, "Can't init event loop");
@@ -148,7 +148,7 @@ EventLoop::EventLoop(uv_stream_t* server)
 }
 
 EventLoop::EventLoop(uv_stream_t* server, uv_loop_t* loop)
-:   server_(server) {
+:   server_{server} {
     loop_.reset(loop, [](uv_loop_t* loop) {
         uv_loop_close(loop);
         delete loop;
@@ -161,9 +161,9 @@ void EventLoop::run() {
 }
 
 Connection::Connection(Server* parent, size_t id)
-:   base_parent_(parent),
-    id_(id) {
-    uv_tcp_t* stream = new uv_tcp_t;
+:   base_parent_{parent},
+    id_{id} {
+    uv_tcp_t* stream = new uv_tcp_t{};
     stream_.reset(reinterpret_cast<uv_stream_t*>(stream));
     UVCHECK(uv_tcp_init(base_parent_->event_loop()->loop(), stream),
         std::runtime_error, "Can't init tcp in Connection");

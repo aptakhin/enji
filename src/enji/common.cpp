@@ -13,19 +13,18 @@ void Thread::run(Func&& thread_func) {
 }
 
 StringView::StringView(const char* data, ssize_t size)
-:   data(data), 
-    size(size) {
-
+:   data{data},
+    size{static_cast<size_t>(size)} {
 }
 
 OweMem::OweMem()
-:   data(nullptr),
-    size(0) {
+:   data{nullptr},
+    size{0} {
 }
 
 OweMem::OweMem(const char* data, size_t size)
-:   data(data),
-    size(size) {
+:   data{data},
+    size{size} {
 }
 
 void OweMem::to_uv_buf(uv_buf_t* cpy) {
