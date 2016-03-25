@@ -2,7 +2,7 @@
 
 using namespace enji;
 
-void index(const HttpRequest& req, HttpOutput& out) {
+void index(const HttpRequest& req, HttpResponse& out) {
     out.add_headers({
         { "Content-Type", "text/html; charset=utf-8" },
     });

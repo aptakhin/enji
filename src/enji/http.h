@@ -26,15 +26,15 @@ private:
     String body_;
 };
 
-class HttpOutput {
+class HttpResponse {
 public:
-    HttpOutput(HttpConnection* conn);
-    ~HttpOutput();
+    HttpResponse(HttpConnection* conn);
+    ~HttpResponse();
 
-    HttpOutput& response(int code=200);
-    HttpOutput& add_headers(std::vector<std::pair<String, String>> headers);
-    HttpOutput& add_header(const String& name, const String& value);
-    HttpOutput& body(const String& value);
+    HttpResponse& response(int code=200);
+    HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
+    HttpResponse& add_header(const String& name, const String& value);
+    HttpResponse& body(const String& value);
 
     void flush();
     void close();
@@ -53,8 +53,8 @@ private:
 
 struct HttpRoute {
 public:
-    typedef void (*FuncHandler)(const HttpRequest&, HttpOutput&);
-    typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
+    typedef void (*FuncHandler)(const HttpRequest&, HttpResponse&);
+    typedef std::function<void(const HttpRequest&, HttpResponse&)> Handler;
 
     HttpRoute(const char* path, Handler handler);
     HttpRoute(String&& path, Handler handler);

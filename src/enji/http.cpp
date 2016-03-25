@@ -115,7 +115,7 @@ void HttpConnection::check_header_finished() {
     }
 }
 
-HttpOutput::HttpOutput(HttpConnection* conn)
+HttpResponse::HttpResponse(HttpConnection* conn)
 :   conn_(conn),
     response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
     headers_(std::stringstream::in | std::stringstream::out | std::stringstream::binary), 
@@ -123,23 +123,23 @@ HttpOutput::HttpOutput(HttpConnection* conn)
     full_response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
 }
 
-HttpOutput::~HttpOutput() {
+HttpResponse::~HttpResponse() {
     close();
 }
 
-HttpOutput& HttpOutput::response(int code) {
+HttpResponse& HttpResponse::response(int code) {
     response_ << "HTTP/1.1 " << code << "\r\n";
     return *this;
 }
 
-HttpOutput& HttpOutput::add_headers(std::vector<std::pair<String, String>> headers) {
+HttpResponse& HttpResponse::add_headers(std::vector<std::pair<String, String>> headers) {
     for (auto&& h : headers) {
         add_header(h.first, h.second);
     }
     return *this;
 }
 
-HttpOutput& HttpOutput::add_header(const String& name, const String& value) {
+HttpResponse& HttpResponse::add_header(const String& name, const String& value) {
     if (headers_sent_) {
         throw std::runtime_error("Can add headers to response. Headers already sent");
     }
@@ -147,7 +147,7 @@ HttpOutput& HttpOutput::add_header(const String& name, const String& value) {
     return *this;
 }
 
-HttpOutput& HttpOutput::body(const String& value) {
+HttpResponse& HttpResponse::body(const String& value) {
     body_ << value;
     return *this;
 }
@@ -178,7 +178,7 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
     }
 }
 
-void HttpOutput::flush() {
+void HttpResponse::flush() {
     if (!headers_sent_) {
         if (!stream2stream(full_response_, response_)) {
             full_response_ << "HTTP/1.1 200\r\n";
@@ -201,7 +201,7 @@ void HttpOutput::flush() {
     stream2conn(conn_, full_response_);
 }
 
-void HttpOutput::close() {
+void HttpResponse::close() {
     flush();
     conn_->close();
 }
@@ -247,7 +247,7 @@ bool route_matches(const HttpRequest& request, const HttpRoute& route) {
 void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
         if (route_matches(request, route)) {
-            HttpOutput out(bind);
+            HttpResponse out(bind);
             route.handler(request, out);
             out.close();
         }
