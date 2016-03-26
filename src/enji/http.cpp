@@ -277,11 +277,14 @@ String match1_filename(const HttpRequest& req) {
 }
 
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
-    return HttpRoute::Handler{[request2file{std::move(request2file)}](const HttpRequest& req, HttpResponse& out)->void
+    String dir = root_dir;
+    return HttpRoute::Handler{
+        [request2file{std::move(request2file)}, dir{std::move(dir)}]
+        (const HttpRequest& req, HttpResponse& out)->void
     {
         uv_fs_t open_req;
         const auto filename = request2file(req);
-        uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
+        uv_fs_open(nullptr, &open_req, path_join(dir, filename).c_str(), O_RDONLY, _S_IREAD, nullptr);
         const auto fd = static_cast<uv_file>(open_req.result);
 
         if (fd < 0) {

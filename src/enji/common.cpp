@@ -32,4 +32,8 @@ void OweMem::to_uv_buf(uv_buf_t* cpy) {
     cpy->len = size_t(size);
 }
 
+bool is_slash(const char c) {
+    return c == '/' || c == '\\';
+}
+
 } // namespace enji

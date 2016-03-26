@@ -194,4 +194,32 @@ void uvcheck(int resp_code, const char* enji_error, const char* file, int line) 
 
 #define UVCHECK(resp_code, exc, enji_error) { uvcheck<exc>((resp_code), (enji_error), __FILE__, __LINE__); }
 
+bool is_slash(const char c);
+
+template<typename Append>
+void path_join_append_one(String& to, Append append) {
+    if (!to.empty() && !is_slash(to[to.size() - 1])) {
+        to += '/';
+    }
+    to += append;
+}
+
+template<typename First>
+void path_join_impl(String& buf, First first) {
+    path_join_append_one(buf, first);
+}
+
+template<typename First, typename... Types>
+void path_join_impl(String& buf, First first, Types... tail) {
+    path_join_append_one(buf, first);
+    path_join_impl(buf, tail...);
+}
+
+template<typename ... Types>
+String path_join(Types... args) {
+    String buf;
+    path_join_impl(buf, args...);
+    return buf;
+}
+
 } // namespace enji
