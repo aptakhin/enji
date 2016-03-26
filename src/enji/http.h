@@ -68,12 +68,17 @@ public:
     HttpRoute(const char* path, FuncHandler handler);
     HttpRoute(String&& path, FuncHandler handler);
 
-    //protected:
-public:
-    String method;
-    String name;
-    String path;
-    Handler handler;
+    std::smatch match(const String& url) const;
+
+    void call_handler(const HttpRequest&, HttpResponse&);
+
+private:
+    String method_;
+    String name_;
+    String path_;
+    Handler handler_;
+
+    std::regex path_match_;
 };
 
 class HttpServer : public Server {

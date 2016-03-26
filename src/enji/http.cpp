@@ -102,7 +102,6 @@ int HttpConnection::on_message_complete() {
 }
 
 void HttpConnection::handle_input(StringView data) {
-    //std::cout << String(data.data, data.data + data.size);
     http_parser_execute(parser_.get(), &get_http_settings(), data.data, data.size);
     
     if (message_completed_) {
@@ -215,23 +214,37 @@ void HttpResponse::close() {
 }
 
 HttpRoute::HttpRoute(const char* path, Handler handler)
-:   path{path},
-    handler{handler} {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(String&& path, Handler handler)
-:   path{path},
-    handler{handler} {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(const char* path, FuncHandler handler)
-:   path{path},
-    handler{handler} {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(String&& path, FuncHandler handler)
-:   path{path},
-    handler{handler} {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
+}
+
+std::smatch HttpRoute::match(const String& url) const {
+    std::smatch match_groups;
+    std::regex_search(url, match_groups, path_match_);
+    return match_groups;
+}
+
+void HttpRoute::call_handler(const HttpRequest& req, HttpResponse& out) {
+    handler_(req, out);
 }
 
 HttpServer::HttpServer(ServerOptions&& options)
@@ -248,25 +261,13 @@ void HttpServer::add_route(HttpRoute&& route) {
     routes_.emplace_back(route);
 }
 
-bool route_matches(const HttpRequest& request, const HttpRoute& route) {
-    std::regex self_regex(route.path,
-        std::regex_constants::ECMAScript | std::regex_constants::icase);
-    std::smatch match;
-    bool res = std::regex_search(request.url(), match, self_regex);
-    return res;
-}
-
 void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
-        std::regex self_regex(route.path,
-            std::regex_constants::ECMAScript | std::regex_constants::icase);
-        std::smatch match;
-        bool matches = std::regex_search(request.url(), match, self_regex);
-
-        if (matches) {
+        auto matches = route.match(request.url());
+        if (!matches.empty()) {
             HttpResponse out{bind};
-            request.set_match(match);
-            route.handler(request, out);
+            request.set_match(matches);
+            route.call_handler(request, out);
             out.close();
         }
     }
