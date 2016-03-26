@@ -296,10 +296,10 @@ HttpRoute::Handler serve_static(const String& root_dir, std::function<String(con
         auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
 
         uv_fs_t read_req;
-        std::vector<char> mem;
-        mem.resize(4096);
+        const size_t alloc_block = 4096;
+        char mem[alloc_block];
         while (true) {
-            uv_buf_t buf[] = {uv_buf_init(&mem.front(), static_cast<unsigned int>(mem.size()))};
+            uv_buf_t buf[] = {uv_buf_init(mem, sizeof(mem))};
             int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
             auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
             out.body(buf[0].base, read);
