@@ -1,4 +1,7 @@
 #include "http.h"
+#include <fcntl.h>
+#include <io.h>
+#include <fstream>
 
 namespace enji {
 
@@ -267,6 +270,44 @@ void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
             out.close();
         }
     }
+}
+
+String match1_filename(const HttpRequest& req) {
+   return req.match()[1].str();
+}
+
+HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
+    return HttpRoute::Handler{[request2file{std::move(request2file)}](const HttpRequest& req, HttpResponse& out)->void
+    {
+        uv_fs_t open_req;
+        const auto filename = request2file(req);
+        uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
+        const auto fd = static_cast<uv_file>(open_req.result);
+
+        if (fd < 0) {
+            out.response(404);
+            return;
+        }
+
+        auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
+
+        uv_fs_t read_req;
+        std::vector<char> mem;
+        mem.resize(4096);
+        while (true) {
+            uv_buf_t buf[] = {uv_buf_init(&mem.front(), static_cast<unsigned int>(mem.size()))};
+            int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
+            auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
+            out.body(buf[0].base, read);
+            if (static_cast<unsigned int>(read) < buf[0].len) {
+                break;
+            }
+        }
+
+        uv_fs_t close_req;
+        uv_fs_close(nullptr, &close_req, fd, nullptr);
+        auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
+    }};
 }
 
 } // namespace enji

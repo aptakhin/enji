@@ -60,7 +60,7 @@ private:
 struct HttpRoute {
 public:
     typedef void (*FuncHandler)(const HttpRequest&, HttpResponse&);
-    typedef std::function<void(const HttpRequest&, HttpResponse&)> Handler;
+    typedef std::function<void (const HttpRequest&, HttpResponse&)> Handler;
 
     HttpRoute(const char* path, Handler handler);
     HttpRoute(String&& path, Handler handler);
@@ -124,5 +124,10 @@ private:
     RHeader read_header_;
     bool message_completed_ = false;
 };
+
+
+String match1_filename(const HttpRequest& req);
+
+HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file);
 
 } // namespace enji
