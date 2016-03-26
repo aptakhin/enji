@@ -152,6 +152,11 @@ HttpResponse& HttpResponse::body(const String& value) {
     return *this;
 }
 
+HttpResponse& HttpResponse::body(const void* data, size_t length) {
+    body_.write(static_cast<const char*>(data), length);
+    return *this;
+}
+
 bool stream2stream(std::stringstream& output, std::stringstream& input) {
     const size_t alloc_block = 4096;
     char tmp[alloc_block];
@@ -241,13 +246,23 @@ void HttpServer::add_route(HttpRoute&& route) {
 }
 
 bool route_matches(const HttpRequest& request, const HttpRoute& route) {
-    return route.path == request.url();
+    std::regex self_regex(route.path,
+        std::regex_constants::ECMAScript | std::regex_constants::icase);
+    std::smatch match;
+    bool res = std::regex_search(request.url(), match, self_regex);
+    return res;
 }
 
-void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
+void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
-        if (route_matches(request, route)) {
+        std::regex self_regex(route.path,
+            std::regex_constants::ECMAScript | std::regex_constants::icase);
+        std::smatch match;
+        bool matches = std::regex_search(request.url(), match, self_regex);
+
+        if (matches) {
             HttpResponse out{bind};
+            request.set_match(match);
             route.handler(request, out);
             out.close();
         }

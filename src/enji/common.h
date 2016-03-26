@@ -20,6 +20,25 @@ class Connection;
 
 typedef std::string String;
 
+class Defer {
+public:
+    typedef std::function<void (void)> Deleter;
+
+    Defer(Deleter&& deleter)
+    :   deleter_(deleter) {}
+
+    ~Defer() {
+        deleter_();
+    }
+
+    void reset(Deleter&& deleter) {
+        deleter_ = deleter;
+    }
+
+private:
+    Deleter deleter_;
+};
+
 template<typename Resource>
 class ScopeExit {
 public:
@@ -28,12 +47,12 @@ public:
     ScopeExit() { }
 
     ScopeExit(Resource&& resource, Deleter&& deleter)
-    :   on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) {}
+    :   on_{std::forward<Resource>(resource), std::forward<Deleter>(deleter)} {}
 
     void reset(Resource&& resource, Deleter&& deleter) {
-        on_ = std::unique_ptr<Resource, Deleter>(
+        on_ = std::unique_ptr<Resource, Deleter>{
             std::forward<Resource>(resource), std::forward<Deleter>(deleter)
-        );
+        };
     }
 
     Resource* operator ~() {
@@ -52,10 +71,10 @@ public:
     ScopePtrExit() { }
 
     ScopePtrExit(Resource* resource, Deleter&& deleter)
-    :   on_(resource, std::forward<Deleter>(deleter)) { }
+    :   on_{resource, std::forward<Deleter>(deleter)} { }
 
     void reset(Resource* resource, Deleter&& deleter) {
-        on_ = std::unique_ptr<Resource, Deleter>(resource, std::forward<Deleter>(deleter));
+        on_ = std::unique_ptr<Resource, Deleter>{resource, std::forward<Deleter>(deleter)};
     }
 
     Resource* operator ~() const {
@@ -69,7 +88,7 @@ private:
 
 class Thread {
 public:
-    typedef std::function<void(void)> Func;
+    typedef std::function<void (void)> Func;
 
     friend void run_thread(void* arg);
 

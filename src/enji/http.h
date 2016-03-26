@@ -1,7 +1,7 @@
 #pragma once
 
 #include <http_parser.h>
-
+#include <regex>
 #include "server.h"
 
 namespace enji {
@@ -16,10 +16,15 @@ public:
 
     const String& body() const { return body_; }
 
+    void set_match(const std::smatch& match) { match_ = match; }
+    const std::smatch& match() const { return match_; }
+
 private:
     String method_;
     String url_;
     bool url_ready_;
+
+    std::smatch match_;
 
     std::multimap<String, String> headers_;
 
@@ -35,6 +40,7 @@ public:
     HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
     HttpResponse& add_header(const String& name, const String& value);
     HttpResponse& body(const String& value);
+    HttpResponse& body(const void* data, size_t length);
 
     void flush();
     void close();
@@ -79,7 +85,7 @@ public:
     std::vector<HttpRoute>& routes() { return routes_; }
     const std::vector<HttpRoute>& routes() const { return routes_; }
 
-    void call_handler(const HttpRequest& request, HttpConnection* bind);
+    void call_handler(HttpRequest& request, HttpConnection* bind);
 
 protected:
     std::vector<HttpRoute> routes_;

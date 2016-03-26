@@ -35,7 +35,9 @@ add_library(
 add_executable(enjitests tests/test.cpp deps/src/gtest/gtest-all.cc)
 add_executable(hello_world examples/hello_world.cpp)
 add_executable(ping_pong examples/ping_pong.cpp)
+add_executable(web_view examples/web_view.cpp)
 
 target_link_libraries(enjitests enji ${ENJI_LIBS})
 target_link_libraries(hello_world enji ${ENJI_LIBS})
 target_link_libraries(ping_pong enji ${ENJI_LIBS})
+target_link_libraries(web_view enji ${ENJI_LIBS})
