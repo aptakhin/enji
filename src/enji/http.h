@@ -112,7 +112,7 @@ public:
 
     int on_http_headers_complete();
 
-    int on_http_body();
+    int on_http_body(const char* at, size_t len);
     int on_message_complete();
 
     void check_header_finished();

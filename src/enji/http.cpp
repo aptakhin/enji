@@ -36,7 +36,7 @@ int cb_http_headers_complete(http_parser* parser) {
 
 int cb_http_body(http_parser* parser, const char* at, size_t len) {
     HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
-    return handler.on_http_body();
+    return handler.on_http_body(at, len);
 }
 
 int cb_http_message_complete(http_parser* parser) {
@@ -92,7 +92,8 @@ int HttpConnection::on_http_headers_complete() {
     return 0;
 }
 
-int HttpConnection::on_http_body() {
+int HttpConnection::on_http_body(const char* at, size_t len) {
+    request_->body_ += String{at, len};
     return 0;
 }
 
@@ -286,14 +287,13 @@ HttpRoute::Handler serve_static(const String& root_dir, std::function<String(con
         uv_fs_t open_req;
         const auto filename = request2file(req);
         uv_fs_open(nullptr, &open_req, path_join(dir, filename).c_str(), O_RDONLY, _S_IREAD, nullptr);
+        auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
         const auto fd = static_cast<uv_file>(open_req.result);
 
         if (fd < 0) {
             out.response(404);
             return;
         }
-
-        auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
 
         uv_fs_t read_req;
         const size_t alloc_block = 4096;
