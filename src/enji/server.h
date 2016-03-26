@@ -96,6 +96,8 @@ public:
     virtual void handle_input(StringView data) {}
 
     void write_chunk(OweMem mem_block);
+    void write_chunk(std::ostringstream& buf);
+
     void close();
 
     void accept();

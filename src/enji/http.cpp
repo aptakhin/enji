@@ -97,8 +97,71 @@ int HttpConnection::on_http_body(const char* at, size_t len) {
     return 0;
 }
 
+const String MULTIPART_FORM_DATA = "multipart/form-data; boundary=";
+
 int HttpConnection::on_message_complete() {
     message_completed_ = true;
+
+    auto expect_iter = request_->headers_.find("Expect");
+
+    if (expect_iter != request_->headers_.end()) {
+        if (expect_iter->second == "100-continue") {
+            message_completed_ = false;
+            std::ostringstream buf;
+            buf << "HTTP/1.1 100 Continue\r\n";
+            write_chunk(buf);
+        }
+    }
+
+    auto content_type_iter = request_->headers_.find("Content-Type");
+    if (content_type_iter != request_->headers_.end()) {
+        String boundary;
+        auto multipart = content_type_iter->second.find(MULTIPART_FORM_DATA);
+        if (multipart != String::npos) {
+            auto boundary_start = multipart + MULTIPART_FORM_DATA.size();
+            boundary = content_type_iter->second.substr(boundary_start);
+        }
+
+        std::vector<size_t> occurrences;
+        size_t start = 0;
+
+        boundary = "--" + boundary;
+
+        while ((start = request_->body_.find(boundary, start)) != String::npos) {
+            occurrences.push_back(start);
+            start += boundary.length();
+        }
+
+        const char* body = &request_->body_.front();
+        for (size_t occurence = 1; occurence < occurrences.size(); ++occurence) {
+            auto file_content = String{
+                body + occurrences[occurence - 1] + boundary.length() + 2,
+                body + occurrences[occurence]
+            };
+
+            auto headers_finished = file_content.find("\r\n\r\n");
+            auto headers = file_content.substr(0, headers_finished);
+
+            std::regex regex("Content-Disposition: form-data; name=\"(.+)\"; filename=\"(.+)\"");
+            std::smatch match_groups;
+            std::regex_search(headers, match_groups, regex);
+
+            File file;
+           
+            if (!match_groups.empty()) {
+                file.name_ = match_groups[1].str();
+                file.filename_ = match_groups[2].str();
+            }
+            
+            auto file_body = file_content.substr(headers_finished + 4);
+
+            file.body_ = std::move(file_body);
+
+            request_->files_.emplace_back(std::move(file));
+        }
+    }
+   
+
     return 0;
 }
 
@@ -150,16 +213,6 @@ HttpResponse& HttpResponse::add_header(const String& name, const String& value) 
     return *this;
 }
 
-HttpResponse& HttpResponse::body(const String& value) {
-    body_ << value;
-    return *this;
-}
-
-HttpResponse& HttpResponse::body(const void* data, size_t length) {
-    body_.write(static_cast<const char*>(data), length);
-    return *this;
-}
-
 bool stream2stream(std::stringstream& output, std::stringstream& input) {
     const size_t alloc_block = 4096;
     char tmp[alloc_block];
@@ -184,6 +237,21 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
         OweMem mem = {data, size};
         conn->write_chunk(mem);
     }
+}
+
+HttpResponse& HttpResponse::body(const String& value) {
+    body_ << value;
+    return *this;
+}
+
+HttpResponse& HttpResponse::body(std::stringstream&& buf) {
+    stream2stream(body_, buf);
+    return *this;
+}
+
+HttpResponse& HttpResponse::body(const void* data, size_t length) {
+    body_.write(static_cast<const char*>(data), length);
+    return *this;
 }
 
 void HttpResponse::flush() {

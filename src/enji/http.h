@@ -8,6 +8,18 @@ namespace enji {
 
 class HttpConnection;
 
+class File {
+public:
+    const String& name() const { return name_; }
+    const String& filename() const { return filename_; }
+    const String& body() const { return body_; }
+
+public:
+    String name_;
+    String filename_;
+    String body_;
+};
+
 class HttpRequest {
 public:
     friend class HttpConnection;
@@ -15,6 +27,8 @@ public:
     const String& url() const { return url_; }
 
     const String& body() const { return body_; }
+
+    const std::vector<File>& files() const { return files_; }
 
     void set_match(const std::smatch& match) { match_ = match; }
     const std::smatch& match() const { return match_; }
@@ -29,6 +43,8 @@ private:
     std::multimap<String, String> headers_;
 
     String body_;
+
+    std::vector<File> files_;
 };
 
 class HttpResponse {
@@ -40,6 +56,7 @@ public:
     HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
     HttpResponse& add_header(const String& name, const String& value);
     HttpResponse& body(const String& value);
+    HttpResponse& body(std::stringstream&& buf);
     HttpResponse& body(const void* data, size_t length);
 
     void flush();
