@@ -32,7 +32,6 @@ void cb_after_shutdown(uv_shutdown_t* shutdown, int status) {
 }
 
 void cb_alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-    //std::cout << "Callback alloc " << suggested_size << std::endl;
     buf->base = new char[suggested_size];
     buf->len = size_t(suggested_size);
 }
@@ -119,8 +118,6 @@ void Server::queue_read(Connection* conn, OweMem mem_block) {
     }
     else {
         input_queue_.push(SignalEvent{conn, mem_block, READ});
-        //or
-        //uv_queue_work(proc_->loop(), work_req, on_work_cb, on_after_work_cb);
     }
 }
 
@@ -197,8 +194,6 @@ void on_after_work_cb(uv_work_t* req, int status) {
 }
 
 void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
-    log() << "read bytes " << nread << std::endl;
-
     if (nread > 0) {
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
         base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
@@ -213,9 +208,9 @@ void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     }
 
     if (nread < 0) {
-        //parent_->output_queue_.push(SignalEvent{this, uv_buf_t{}, RequestSignalType::INPUT_EOF});
-        /*assert(nread == UV_EOF);*/
-        log() << "err: " << uv_strerror(int(nread)) << "\n";
+        //
+        // FIXME: Write properly status == UV_EOF
+        //
 
         auto shutdown = new uv_shutdown_t;
         shutdown->data = this;
@@ -231,17 +226,11 @@ void Connection::on_after_write(uv_write_t* req, int status) {
     UVCHECK(status,
         std::runtime_error, "Bad status of write operation");
 
-//    if (status == 0)
-//        return;
-//
-//    fprintf(stderr, "uv_write error: %s\n", uv_strerror(status));
-//
-//    if (status == UV_ECANCELED)
-//        return;
-//
-//    assert(status == UV_EPIPE);
+    //
+    // FIXME: Write properly status == 0, UV_ECANCELED, error
+    //
+
     if (write_result->close) {
-        log() << "close" << "\n";
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
 
@@ -252,9 +241,9 @@ void Connection::on_after_write(uv_write_t* req, int status) {
 void Connection::on_after_shutdown(uv_shutdown_t* shutdown, int status) {
     UVCHECK(status,
         std::runtime_error, "Bad status of shutdown operation");
-    if (status < 0) {
-        log() << "err " << uv_strerror(status) << "\n";
-    }
+    //
+    // FIXME: Write properly status < 0
+    //
 
     uv_close((uv_handle_t*) shutdown->handle, cb_close);
     delete shutdown;
