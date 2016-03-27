@@ -17,7 +17,7 @@ void index(const HttpRequest& req, HttpResponse& out) {
 
 int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
     auto values = reinterpret_cast<Value*>(values_ptr);
-    auto row = Value{std::map<Value, Value>{}};
+    auto row = Value::make_dict();
     for (int i = 0; i < argc; i++) {
         if (argv[i]) {
             row[col_name[i]] = argv[i];
@@ -29,7 +29,7 @@ int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
 
 void api_view(const HttpRequest& req, HttpResponse& out) {
     char* err_msg = 0;
-    Value grams{std::vector<Value>{}};
+    auto grams = Value::make_array();
     sqlite3_exec(db, "SELECT * FROM grams;", select_callback, (void*)&grams, &err_msg);
 
     std::stringstream grams_json;
@@ -76,10 +76,8 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
         //
 
         char* err_msg = 0;
-        sqlite3_exec(db, sql.str().c_str(), select_callback, 0, &err_msg);
-
-
-//std::runtime_error, "Can't insert into grams table");
+        ZEROCHECK(sqlite3_exec(db, sql.str().c_str(), select_callback, 0, &err_msg),
+            std::runtime_error, "Can't insert into grams", &err_msg);
     }
 
     temporary_redirect("/", out);
@@ -96,11 +94,10 @@ int main(int argc, char* argv[]) {
     uv_fs_t web_cache_dir_req;
     uv_fs_mkdir(nullptr, &web_cache_dir_req, WEBCACHE_DIR.c_str(), 0, nullptr);
 
-    ZEROCHECK(sqlite3_open("test.db", &db),
-        std::runtime_error, "Can't open database");
-    auto close_db = Defer{[] { sqlite3_close(db); }};
-
     char* err_msg = 0;
+    ZEROCHECK(sqlite3_open("test.db", &db),
+        std::runtime_error, "Can't open database", &err_msg);
+    auto close_db = Defer{[] { sqlite3_close(db); }};
 
     auto sql = "CREATE TABLE IF NOT EXISTS grams ("  \
         "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," \
@@ -108,7 +105,7 @@ int main(int argc, char* argv[]) {
         "published DATETIME);";
 
     ZEROCHECK(sqlite3_exec(db, sql, select_callback, 0, &err_msg),
-        std::runtime_error, "Can't create grams table");
+        std::runtime_error, "Can't create grams table", &err_msg);
 
     ServerOptions opts;
     opts.port = 3001;

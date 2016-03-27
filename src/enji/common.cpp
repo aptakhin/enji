@@ -57,27 +57,35 @@ String path_extension(const String& filename) {
 }
 
 Value::Value()
-    : type_(ValueType::NONE) {}
+:   type_(ValueType::NONE) {}
 
 Value::Value(std::map<Value, Value> dict)
-    : type_(ValueType::DICT),
+:   type_(ValueType::DICT),
     dict_(dict) {}
 
 Value::Value(std::vector<Value> arr)
-    : type_(ValueType::ARRAY),
+:   type_(ValueType::ARRAY),
     array_(arr) {}
 
 Value::Value(double real)
-    : type_(ValueType::REAL),
+:   type_(ValueType::REAL),
     real_(real) {}
 
 Value::Value(String str)
-    : type_(ValueType::STR),
+:   type_(ValueType::STR),
     str_(str) {}
 
 Value::Value(const char* str)
-    : type_(ValueType::STR),
+:   type_(ValueType::STR),
     str_(str) {}
+
+Value Value::make_dict() {
+    return Value(std::map<Value, Value>{});
+}
+
+Value Value::make_array() {
+    return Value(std::vector<Value>{});
+}
 
 std::map<Value, Value>& Value::dict() {
     if (type_ != ValueType::DICT)

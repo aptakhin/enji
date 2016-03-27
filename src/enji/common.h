@@ -188,12 +188,27 @@ void uvcheck(int resp_code, String&& enji_error, const char* file, int line) {
 }
 
 template <typename Exc>
+void zerocheck(int resp_code, const char* title_msg, char** err_msg, const char* file, int line) {
+    if (resp_code != 0) {
+        std::ostringstream err;
+        err << title_msg;
+        if (*err_msg) {
+            err << " (msg: " << *err_msg << " code: " << resp_code << ")";
+        } else {
+            err << " (code: " << resp_code << ")";
+        }
+            
+        throw Exc(err.str());
+    }
+}
+
+template <typename Exc>
 void uvcheck(int resp_code, const char* enji_error, const char* file, int line) {
     uvcheck<Exc>(resp_code, String(enji_error), file, line);
 }
 
 #define UVCHECK(resp_code, exc, enji_error) { uvcheck<exc>((resp_code), (enji_error), __FILE__, __LINE__); }
-#define ZEROCHECK(resp_code, exc, enji_error) UVCHECK(resp_code, exc, enji_error)
+#define ZEROCHECK(resp_code, exc, title, enji_error) { zerocheck<exc>((resp_code), (title), (enji_error), __FILE__, __LINE__); }
 
 bool is_slash(const char c);
 
@@ -302,6 +317,9 @@ public:
     Value(double d);
     Value(String str);
     Value(const char* str);
+
+    static Value make_dict();
+    static Value make_array();
 
     std::map<Value, Value>& dict();
     std::vector<Value>& array();
