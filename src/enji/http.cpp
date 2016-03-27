@@ -152,6 +152,10 @@ int HttpConnection::on_message_complete() {
                 file.name_ = match_groups[1].str();
                 file.filename_ = match_groups[2].str();
             }
+
+            if (file.name_.empty() && file.filename_.empty()) {
+                continue;
+            }
             
             auto file_body = file_content.substr(headers_finished + 4);
 
@@ -407,6 +411,12 @@ void response_file(const String& filename, HttpResponse& out) {
     uv_fs_t close_req;
     uv_fs_close(nullptr, &close_req, fd, nullptr);
     auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
+}
+
+void temporary_redirect(String redirect_to, HttpResponse& out) {
+    out.response(307);
+    out.add_header("Location", redirect_to);
+    out.close();
 }
 
 } // namespace enji

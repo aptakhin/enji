@@ -224,6 +224,7 @@ String path_join(Types... args) {
 }
 
 String path_dirname(const String& filename);
+String path_extension(const String& filename);
 
 template <typename ContA, typename ContB>
 class Zip {

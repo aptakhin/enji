@@ -47,6 +47,15 @@ String path_dirname(const String& filename) {
     return filename.substr(0, last_slash);
 }
 
+String path_extension(const String& filename) {
+    auto last_dot = filename.find_last_of('.');
+    if (last_dot == String::npos) {
+        return "";
+    } else {
+        return filename.substr(last_dot + 1);
+    }
+}
+
 Value::Value()
     : type_(ValueType::NONE) {}
 

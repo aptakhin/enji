@@ -161,4 +161,6 @@ HttpRoute::Handler serve_static(const String& root_dir, std::function<String(con
 void static_file(const String& filename, HttpResponse& out, const Config& config = ServerConfig);
 void response_file(const String& filename, HttpResponse& out);
 
+void temporary_redirect(String redirect_to, HttpResponse& out);
+
 } // namespace enji

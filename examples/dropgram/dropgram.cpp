@@ -1,6 +1,8 @@
 #include <enji/http.h>
 
+#include <fstream>
 #include <iomanip>
+#include <functional>
 #include <stdio.h>
 #include <sqlite3.h>
 
@@ -55,9 +57,20 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
 
     for (auto&& file : req.files()) {
         std::ostringstream sql;
+        
+        std::ostringstream filename_buf;
+        std::time_t timestamp = std::time(nullptr);
+        filename_buf << std::hash<String>{}(file.filename()) << timestamp;
+        filename_buf << "." << path_extension(file.filename());
+
+        const auto filename = filename_buf.str();
+
+        auto gram_file = std::ofstream{path_join(WEBCACHE_DIR, filename).c_str(), std::ios::binary};
+        gram_file.write(&file.body().front(), file.body().length());
+        gram_file.close();
 
         sql << "INSERT INTO grams (filename, published) VALUES ('";
-        sql << file.filename() << "', " << "datetime('now'));";
+        sql << filename << "', " << "datetime('now'));";
         //
         // FIXME: bind here
         //
@@ -65,8 +78,11 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
         char* err_msg = 0;
         sqlite3_exec(db, sql.str().c_str(), select_callback, 0, &err_msg);
 
+
 //std::runtime_error, "Can't insert into grams table");
     }
+
+    temporary_redirect("/", out);
 }
 
 int main(int argc, char* argv[]) {
