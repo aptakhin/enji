@@ -194,6 +194,7 @@ HttpResponse::~HttpResponse() {
 }
 
 HttpResponse& HttpResponse::response(int code) {
+    code_ = code;
     response_ << "HTTP/1.1 " << code << "\r\n";
     return *this;
 }
@@ -346,6 +347,8 @@ void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
     if (!matched) {
         out.response(404);
     }
+
+    std::cout << request.method() << " " << request.url() << " " << out.code() << std::endl;
 }
 
 String match1_filename(const HttpRequest& req) {

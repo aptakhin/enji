@@ -24,6 +24,7 @@ class HttpRequest {
 public:
     friend class HttpConnection;
 
+    const String& method() const { return method_; }
     const String& url() const { return url_; }
 
     const String& body() const { return body_; }
@@ -52,12 +53,14 @@ public:
     HttpResponse(HttpConnection* conn);
     ~HttpResponse();
 
-    HttpResponse& response(int code=200);
+    HttpResponse& response(int code);
     HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
     HttpResponse& add_header(const String& name, const String& value);
     HttpResponse& body(const String& value);
     HttpResponse& body(std::stringstream& buf);
     HttpResponse& body(const void* data, size_t length);
+
+    int code() const { return code_; }
 
     void flush();
     void close();
@@ -72,6 +75,8 @@ private:
     std::stringstream full_response_;
 
     bool headers_sent_ = false;
+
+    int code_ = 200;
 };
 
 struct HttpRoute {

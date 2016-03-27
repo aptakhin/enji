@@ -36,7 +36,8 @@ void api_view(const HttpRequest& req, HttpResponse& out) {
     for (size_t row_iter = 0; row_iter < grams.array().size(); ++row_iter) {
         Value& row = grams.array()[row_iter];
         grams_json << "{";
-        grams_json << std::quoted("filename") << ": " << std::quoted(path_join("/", "gram", row["filename"].str()));
+        grams_json << std::quoted("filename") << ": " << std::quoted(path_join("/", "gram", row["filename"].str())) << ", ";
+        grams_json << std::quoted("published") << ": " << std::quoted(row["published"].str());
         grams_json << "}";
         if (row_iter + 1 < grams.array().size()) {
             grams_json << ", ";
