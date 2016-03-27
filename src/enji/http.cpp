@@ -214,7 +214,7 @@ HttpResponse& HttpResponse::add_header(const String& name, const String& value) 
 }
 
 bool stream2stream(std::stringstream& output, std::stringstream& input) {
-    const size_t alloc_block = 4096;
+    const size_t alloc_block = 32 * 1024;
     char tmp[alloc_block];
     bool written_smth = false;
     while (input) {
@@ -230,7 +230,7 @@ bool stream2stream(std::stringstream& output, std::stringstream& input) {
 
 void stream2conn(Connection* conn, std::stringstream& buf) {
     while (buf) {
-        size_t alloc_block = 4096;
+        size_t alloc_block = 32 * 1024;
         char* data = new char[alloc_block];
         buf.read(data, alloc_block);
         size_t size = buf.gcount();
@@ -384,7 +384,7 @@ void static_file(const String& filename, HttpResponse& out, const Config& config
     }
 
     uv_fs_t read_req;
-    const size_t alloc_block = 4096;
+    const size_t alloc_block = 64 * 1024;
     size_t offset = 0;
     char mem[alloc_block];
     while (true) {
