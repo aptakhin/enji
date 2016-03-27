@@ -2,6 +2,8 @@
 
 namespace enji {
 
+Config ServerConfig;
+
 Server::Server() { }
 
 Server::Server(ServerOptions&& opts) {
@@ -194,8 +196,8 @@ void on_after_work_cb(uv_work_t* req, int status) {
 }
 
 void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
-    std::cout << String(buf->base, buf->base + nread);
     if (nread > 0) {
+        std::cout << String(buf->base, buf->base + nread);
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
         base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
     }
@@ -273,6 +275,10 @@ void Connection::close() {
         is_closing_ = true;
         base_parent_->queue_close(this);
     }
+}
+
+Config::Config()
+:   root_(std::map<Value, Value>{}) {
 }
 
 } // namespace enji

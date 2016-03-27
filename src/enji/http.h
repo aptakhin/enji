@@ -150,6 +150,9 @@ private:
 
 String match1_filename(const HttpRequest& req);
 
+HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file);
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file);
+
+void static_file(const String& filename, HttpResponse& out, const Config& config = ServerConfig);
 
 } // namespace enji

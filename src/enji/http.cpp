@@ -135,7 +135,7 @@ int HttpConnection::on_message_complete() {
         const char* body = &request_->body_.front();
         for (size_t occurence = 1; occurence < occurrences.size(); ++occurence) {
             auto file_content = String{
-                body + occurrences[occurence - 1] + boundary.length() + 2,
+                body + occurrences[occurence - 1] + boundary.length() + 2, // Skip boundary + "\r\n"
                 body + occurrences[occurence]
             };
 
@@ -331,14 +331,20 @@ void HttpServer::add_route(HttpRoute&& route) {
 }
 
 void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
+    bool matched = false;
+    HttpResponse out{bind};
+
     for (auto&& route : routes_) {
         auto matches = route.match(request.url());
         if (!matches.empty()) {
-            HttpResponse out{bind};
             request.set_match(matches);
             route.call_handler(request, out);
-            out.close();
+            matched = true;
         }
+    }
+
+    if (!matched) {
+        out.response(404);
     }
 }
 
@@ -346,40 +352,53 @@ String match1_filename(const HttpRequest& req) {
    return req.match()[1].str();
 }
 
+HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file) {
+    return HttpRoute::Handler{
+        [request2file{std::move(request2file)}]
+        (const HttpRequest& req, HttpResponse& out)->void
+    {
+        static_file(request2file(req), out);
+    }};
+}
+
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
     String dir = root_dir;
     return HttpRoute::Handler{
         [request2file{std::move(request2file)}, dir{std::move(dir)}]
-        (const HttpRequest& req, HttpResponse& out)->void
+    (const HttpRequest& req, HttpResponse& out)->void
     {
-        uv_fs_t open_req;
-        const auto filename = request2file(req);
-        uv_fs_open(nullptr, &open_req, path_join(dir, filename).c_str(), O_RDONLY, _S_IREAD, nullptr);
-        auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
-        const auto fd = static_cast<uv_file>(open_req.result);
-
-        if (fd < 0) {
-            out.response(404);
-            return;
-        }
-
-        uv_fs_t read_req;
-        const size_t alloc_block = 4096;
-        char mem[alloc_block];
-        while (true) {
-            uv_buf_t buf[] = {uv_buf_init(mem, sizeof(mem))};
-            int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
-            auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
-            out.body(buf[0].base, read);
-            if (static_cast<unsigned int>(read) < buf[0].len) {
-                break;
-            }
-        }
-
-        uv_fs_t close_req;
-        uv_fs_close(nullptr, &close_req, fd, nullptr);
-        auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
+        static_file(path_join(dir, request2file(req)), out);
     }};
+}
+
+void static_file(const String& filename, HttpResponse& out, const Config& config) {
+    uv_fs_t open_req;
+    const auto open_filename = path_join(config["STATIC_ROOT_DIR"].str(), filename);
+    uv_fs_open(nullptr, &open_req, open_filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
+    auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
+    const auto fd = static_cast<uv_file>(open_req.result);
+
+    if (fd < 0) {
+        out.response(404);
+        return;
+    }
+
+    uv_fs_t read_req;
+    const size_t alloc_block = 4096;
+    char mem[alloc_block];
+    while (true) {
+        uv_buf_t buf[] = {uv_buf_init(mem, sizeof(mem))};
+        int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
+        auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
+        out.body(buf[0].base, read);
+        if (static_cast<unsigned int>(read) < buf[0].len) {
+            break;
+        }
+    }
+
+    uv_fs_t close_req;
+    uv_fs_close(nullptr, &close_req, fd, nullptr);
+    auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
 }
 
 } // namespace enji

@@ -124,4 +124,17 @@ protected:
     bool is_closing_ = false;
 };
 
+class Config {
+public:
+    Config();
+
+    Value& operator [] (const char* key) { return root_[key]; }
+    const Value& operator [] (const char* key) const { return root_[key]; }
+
+private:
+    Value root_;
+};
+
+extern Config ServerConfig;
+
 } // namespace enji

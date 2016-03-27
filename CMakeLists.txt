@@ -23,8 +23,18 @@ else()
     set(ENJI_DEPS_LIBS ${LIBUV_LIBRARY})
 endif()
 
-set(ENJI_HEADERS src/enji/common.h src/enji/http.h src/enji/server.h)
-set(ENJI_SOURCES src/enji/common.cpp src/enji/http.cpp src/enji/server.cpp deps/src/http_parser.c)
+set(ENJI_HEADERS
+    src/enji/common.h
+    src/enji/http.h
+    src/enji/server.h
+)
+
+set(ENJI_SOURCES
+    src/enji/common.cpp
+    src/enji/http.cpp
+    src/enji/server.cpp
+    deps/src/http_parser.c
+)
 
 add_library(
     enji
@@ -38,6 +48,11 @@ add_executable(ping_pong examples/ping_pong.cpp)
 add_executable(web_view examples/web_view.cpp)
 add_executable(file_upload examples/file_upload.cpp)
 
+add_executable(dropgram
+    examples/dropgram/dropgram.cpp
+    deps/src/sqlite3.c
+)
+
 set(ENJI_LIBS enji ${ENJI_DEPS_LIBS})
 
 target_link_libraries(enjitests enji ${ENJI_LIBS})
@@ -45,3 +60,5 @@ target_link_libraries(hello_world ${ENJI_LIBS})
 target_link_libraries(ping_pong ${ENJI_LIBS})
 target_link_libraries(web_view ${ENJI_LIBS})
 target_link_libraries(file_upload ${ENJI_LIBS})
+
+target_link_libraries(dropgram ${ENJI_LIBS})

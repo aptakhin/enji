@@ -193,6 +193,7 @@ void uvcheck(int resp_code, const char* enji_error, const char* file, int line) 
 }
 
 #define UVCHECK(resp_code, exc, enji_error) { uvcheck<exc>((resp_code), (enji_error), __FILE__, __LINE__); }
+#define ZEROCHECK(resp_code, exc, enji_error) UVCHECK(resp_code, exc, enji_error)
 
 bool is_slash(const char c);
 
@@ -221,5 +222,117 @@ String path_join(Types... args) {
     path_join_impl(buf, args...);
     return buf;
 }
+
+String path_dirname(const String& filename);
+
+template <typename ContA, typename ContB>
+class Zip {
+public:
+    typedef typename ContA::value_type ValA;
+    typedef typename ContB::value_type ValB;
+
+    Zip(ContA& a, ContB& b)
+        : begin_(a.begin(), b.begin()),
+        end_(a.end(), b.end()) {
+    }
+
+    template <typename IterA, typename IterB>
+    class Iter {
+    private:
+        friend class Zip;
+
+        Iter(IterA ait, IterB bit)
+            : ait_(ait), bit_(bit) {}
+
+    public:
+        Iter& operator ++() {
+            ++ait_, ++bit_;
+            return *this;
+        }
+
+        bool operator == (const Iter& other) const {
+            return ait_ == other.ait_ && bit_ == other.bit_;
+        }
+
+        bool operator != (const Iter& other) const {
+            return !(*this == other);
+        }
+
+        Iter& operator * () {
+            fst = &*ait_; snd = &*bit_;
+            return *this;
+        }
+
+        ValA* fst;
+        ValB* snd;
+
+    private:
+        IterA ait_;
+        IterB bit_;
+    };
+
+    typedef Iter<typename ContA::iterator, typename ContB::iterator> It;
+
+    It begin() const { return begin_; }
+    It end() const { return end_; }
+
+private:
+    It begin_, end_;
+};
+
+template <typename ContA, typename ContB>
+Zip<ContA, ContB> zip(ContA& a, ContB& b) {
+    return{a, b};
+}
+
+enum class ValueType {
+    NONE,
+    DICT,
+    ARRAY,
+    REAL,
+    STR,
+};
+
+class Value {
+public:
+    Value();
+    explicit Value(std::map<Value, Value> dict);
+    explicit Value(std::vector<Value> arr);
+    Value(double d);
+    Value(String str);
+    Value(const char* str);
+
+    std::map<Value, Value>& dict();
+    std::vector<Value>& array();
+    double& real();
+    String& str();
+
+    const std::map<Value, Value>& dict() const;
+    const std::vector<Value>& array() const;
+    const double& real() const;
+    const String& str() const;
+
+    Value& operator [] (const char* key);
+    const Value& operator [] (const char* key) const;
+
+    const std::map<Value, Value>* is_dict() const;
+    const std::vector<Value>* is_array() const;
+    const double* is_real() const;
+    const String* is_str() const;
+
+    ValueType type() const { return type_; }
+
+private:
+    ValueType type_;
+
+    std::map<Value, Value> dict_;
+    std::vector<Value> array_;
+    double real_;
+    std::string str_;
+};
+
+bool operator < (const Value& a, const Value& b);
+bool operator == (const Value& a, const Value& b);
+bool operator != (const Value& a, const Value& b);
 
 } // namespace enji
