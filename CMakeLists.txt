@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(ENJI)
 
-if (!MSVC)
+if (NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
@@ -36,6 +36,8 @@ add_executable(enjitests tests/test.cpp deps/src/gtest/gtest-all.cc)
 add_executable(hello_world examples/hello_world.cpp)
 add_executable(ping_pong examples/ping_pong.cpp)
 
-target_link_libraries(enjitests enji ${ENJI_LIBS})
-target_link_libraries(hello_world enji ${ENJI_LIBS})
-target_link_libraries(ping_pong enji ${ENJI_LIBS})
+set(ENJI_LINKS enji ${ENJI_LIBS})
+
+target_link_libraries(enjitests enji ${ENJI_LINKS})
+target_link_libraries(hello_world ${ENJI_LINKS})
+target_link_libraries(ping_pong ${ENJI_LINKS})
