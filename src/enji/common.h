@@ -20,6 +20,25 @@ class Connection;
 
 typedef std::string String;
 
+class Defer {
+public:
+    typedef std::function<void (void)> Deleter;
+
+    Defer(Deleter&& deleter)
+    :   deleter_(deleter) {}
+
+    ~Defer() {
+        deleter_();
+    }
+
+    void reset(Deleter&& deleter) {
+        deleter_ = deleter;
+    }
+
+private:
+    Deleter deleter_;
+};
+
 template<typename Resource>
 class ScopeExit {
 public:
@@ -28,12 +47,12 @@ public:
     ScopeExit() { }
 
     ScopeExit(Resource&& resource, Deleter&& deleter)
-    :   on_(std::forward<Resource>(resource), std::forward<Deleter>(deleter)) {}
+    :   on_{std::forward<Resource>(resource), std::forward<Deleter>(deleter)} {}
 
     void reset(Resource&& resource, Deleter&& deleter) {
-        on_ = std::unique_ptr<Resource, Deleter>(
+        on_ = std::unique_ptr<Resource, Deleter>{
             std::forward<Resource>(resource), std::forward<Deleter>(deleter)
-        );
+        };
     }
 
     Resource* operator ~() {
@@ -52,10 +71,10 @@ public:
     ScopePtrExit() { }
 
     ScopePtrExit(Resource* resource, Deleter&& deleter)
-    :   on_(resource, std::forward<Deleter>(deleter)) { }
+    :   on_{resource, std::forward<Deleter>(deleter)} { }
 
     void reset(Resource* resource, Deleter&& deleter) {
-        on_ = std::unique_ptr<Resource, Deleter>(resource, std::forward<Deleter>(deleter));
+        on_ = std::unique_ptr<Resource, Deleter>{resource, std::forward<Deleter>(deleter)};
     }
 
     Resource* operator ~() const {
@@ -69,7 +88,7 @@ private:
 
 class Thread {
 public:
-    typedef std::function<void(void)> Func;
+    typedef std::function<void (void)> Func;
 
     friend void run_thread(void* arg);
 
@@ -86,12 +105,12 @@ template<typename T>
 class SafeQueue {
 public:
     void push(T&& value) {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         queue_.emplace(value);
     }
 
     bool pop(T& obj) {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         if (queue_.empty())
             return false;
         obj = std::move(queue_.front());
@@ -100,7 +119,7 @@ public:
     }
 
     bool empty() const {
-        std::lock_guard<std::mutex> guard(mutex_);
+        std::lock_guard<std::mutex> guard{mutex_};
         return queue_.empty();
     }
 
@@ -174,5 +193,33 @@ void uvcheck(int resp_code, const char* enji_error, const char* file, int line) 
 }
 
 #define UVCHECK(resp_code, exc, enji_error) { uvcheck<exc>((resp_code), (enji_error), __FILE__, __LINE__); }
+
+bool is_slash(const char c);
+
+template<typename Append>
+void path_join_append_one(String& to, Append append) {
+    if (!to.empty() && !is_slash(to[to.size() - 1])) {
+        to += '/';
+    }
+    to += append;
+}
+
+template<typename First>
+void path_join_impl(String& buf, First first) {
+    path_join_append_one(buf, first);
+}
+
+template<typename First, typename... Types>
+void path_join_impl(String& buf, First first, Types... tail) {
+    path_join_append_one(buf, first);
+    path_join_impl(buf, tail...);
+}
+
+template<typename ... Types>
+String path_join(Types... args) {
+    String buf;
+    path_join_impl(buf, args...);
+    return buf;
+}
 
 } // namespace enji

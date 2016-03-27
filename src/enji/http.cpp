@@ -1,4 +1,7 @@
 #include "http.h"
+#include <fcntl.h>
+#include <io.h>
+#include <fstream>
 
 namespace enji {
 
@@ -33,7 +36,7 @@ int cb_http_headers_complete(http_parser* parser) {
 
 int cb_http_body(http_parser* parser, const char* at, size_t len) {
     HttpConnection& handler = *reinterpret_cast<HttpConnection*>(parser->data);
-    return handler.on_http_body();
+    return handler.on_http_body(at, len);
 }
 
 int cb_http_message_complete(http_parser* parser) {
@@ -57,7 +60,7 @@ http_parser_settings& get_http_settings() {
 HttpConnection::HttpConnection(HttpServer* parent, size_t id)
 :   Connection(parent, id),
     parent_(parent) {
-    parser_.reset(new http_parser);
+    parser_.reset(new http_parser{});
     http_parser_init(parser_.get(), HTTP_REQUEST);
     parser_.get()->data = this;
 
@@ -69,18 +72,18 @@ const HttpRequest& HttpConnection::request() const {
 }
 
 int HttpConnection::on_http_url(const char* at, size_t len) {
-    request_->url_ += String(at, len);
+    request_->url_ += String{at, len};
     return 0;
 }
 
 int HttpConnection::on_http_header_field(const char* at, size_t len) {
     check_header_finished();
-    read_header_.first += String(at, len);
+    read_header_.first += String{at, len};
     return 0;
 }
 
 int HttpConnection::on_http_header_value(const char* at, size_t len) {
-    read_header_.second += String(at, len);
+    read_header_.second += String{at, len};
     return 0;
 }
 
@@ -89,17 +92,80 @@ int HttpConnection::on_http_headers_complete() {
     return 0;
 }
 
-int HttpConnection::on_http_body() {
+int HttpConnection::on_http_body(const char* at, size_t len) {
+    request_->body_ += String{at, len};
     return 0;
 }
 
+const String MULTIPART_FORM_DATA = "multipart/form-data; boundary=";
+
 int HttpConnection::on_message_complete() {
     message_completed_ = true;
+
+    auto expect_iter = request_->headers_.find("Expect");
+
+    if (expect_iter != request_->headers_.end()) {
+        if (expect_iter->second == "100-continue") {
+            message_completed_ = false;
+            std::ostringstream buf;
+            buf << "HTTP/1.1 100 Continue\r\n";
+            write_chunk(buf);
+        }
+    }
+
+    auto content_type_iter = request_->headers_.find("Content-Type");
+    if (content_type_iter != request_->headers_.end()) {
+        String boundary;
+        auto multipart = content_type_iter->second.find(MULTIPART_FORM_DATA);
+        if (multipart != String::npos) {
+            auto boundary_start = multipart + MULTIPART_FORM_DATA.size();
+            boundary = content_type_iter->second.substr(boundary_start);
+        }
+
+        std::vector<size_t> occurrences;
+        size_t start = 0;
+
+        boundary = "--" + boundary;
+
+        while ((start = request_->body_.find(boundary, start)) != String::npos) {
+            occurrences.push_back(start);
+            start += boundary.length();
+        }
+
+        const char* body = &request_->body_.front();
+        for (size_t occurence = 1; occurence < occurrences.size(); ++occurence) {
+            auto file_content = String{
+                body + occurrences[occurence - 1] + boundary.length() + 2,
+                body + occurrences[occurence]
+            };
+
+            auto headers_finished = file_content.find("\r\n\r\n");
+            auto headers = file_content.substr(0, headers_finished);
+
+            std::regex regex("Content-Disposition: form-data; name=\"(.+)\"; filename=\"(.+)\"");
+            std::smatch match_groups;
+            std::regex_search(headers, match_groups, regex);
+
+            File file;
+           
+            if (!match_groups.empty()) {
+                file.name_ = match_groups[1].str();
+                file.filename_ = match_groups[2].str();
+            }
+            
+            auto file_body = file_content.substr(headers_finished + 4);
+
+            file.body_ = std::move(file_body);
+
+            request_->files_.emplace_back(std::move(file));
+        }
+    }
+   
+
     return 0;
 }
 
 void HttpConnection::handle_input(StringView data) {
-    //std::cout << String(data.data, data.data + data.size);
     http_parser_execute(parser_.get(), &get_http_settings(), data.data, data.size);
     
     if (message_completed_) {
@@ -111,44 +177,39 @@ void HttpConnection::handle_input(StringView data) {
 void HttpConnection::check_header_finished() {
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
         request_->headers_.insert(
-            Header(std::move(read_header_.first), std::move(read_header_.second)));
+            Header{std::move(read_header_.first), std::move(read_header_.second)});
     }
 }
 
-HttpOutput::HttpOutput(HttpConnection* conn)
-:   conn_(conn),
-    response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
-    headers_(std::stringstream::in | std::stringstream::out | std::stringstream::binary), 
-    body_(std::stringstream::in | std::stringstream::out | std::stringstream::binary),
-    full_response_(std::stringstream::in | std::stringstream::out | std::stringstream::binary) {
+HttpResponse::HttpResponse(HttpConnection* conn)
+:   conn_{conn},
+    response_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    headers_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    body_{std::stringstream::in | std::stringstream::out | std::stringstream::binary},
+    full_response_{std::stringstream::in | std::stringstream::out | std::stringstream::binary} {
 }
 
-HttpOutput::~HttpOutput() {
+HttpResponse::~HttpResponse() {
     close();
 }
 
-HttpOutput& HttpOutput::response(int code) {
+HttpResponse& HttpResponse::response(int code) {
     response_ << "HTTP/1.1 " << code << "\r\n";
     return *this;
 }
 
-HttpOutput& HttpOutput::add_headers(std::vector<std::pair<String, String>> headers) {
+HttpResponse& HttpResponse::add_headers(std::vector<std::pair<String, String>> headers) {
     for (auto&& h : headers) {
         add_header(h.first, h.second);
     }
     return *this;
 }
 
-HttpOutput& HttpOutput::add_header(const String& name, const String& value) {
+HttpResponse& HttpResponse::add_header(const String& name, const String& value) {
     if (headers_sent_) {
-        throw std::runtime_error("Can add headers to response. Headers already sent");
+        throw std::runtime_error("Can't add headers to response. Headers already sent");
     }
     headers_ << name << ": " << value << "\r\n";
-    return *this;
-}
-
-HttpOutput& HttpOutput::body(const String& value) {
-    body_ << value;
     return *this;
 }
 
@@ -173,12 +234,27 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
         char* data = new char[alloc_block];
         buf.read(data, alloc_block);
         size_t size = buf.gcount();
-        OweMem mem = { data, size };
+        OweMem mem = {data, size};
         conn->write_chunk(mem);
     }
 }
 
-void HttpOutput::flush() {
+HttpResponse& HttpResponse::body(const String& value) {
+    body_ << value;
+    return *this;
+}
+
+HttpResponse& HttpResponse::body(std::stringstream&& buf) {
+    stream2stream(body_, buf);
+    return *this;
+}
+
+HttpResponse& HttpResponse::body(const void* data, size_t length) {
+    body_.write(static_cast<const char*>(data), length);
+    return *this;
+}
+
+void HttpResponse::flush() {
     if (!headers_sent_) {
         if (!stream2stream(full_response_, response_)) {
             full_response_ << "HTTP/1.1 200\r\n";
@@ -201,33 +277,47 @@ void HttpOutput::flush() {
     stream2conn(conn_, full_response_);
 }
 
-void HttpOutput::close() {
+void HttpResponse::close() {
     flush();
     conn_->close();
 }
 
 HttpRoute::HttpRoute(const char* path, Handler handler)
-:   path(path),
-    handler(handler) {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(String&& path, Handler handler)
-:   path(path),
-    handler(handler) {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(const char* path, FuncHandler handler)
-:   path(path),
-    handler(handler) {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
 }
 
 HttpRoute::HttpRoute(String&& path, FuncHandler handler)
-:   path(path),
-    handler(handler) {
+:   path_{path},
+    handler_{handler},
+    path_match_(path) {
+}
+
+std::smatch HttpRoute::match(const String& url) const {
+    std::smatch match_groups;
+    std::regex_search(url, match_groups, path_match_);
+    return match_groups;
+}
+
+void HttpRoute::call_handler(const HttpRequest& req, HttpResponse& out) {
+    handler_(req, out);
 }
 
 HttpServer::HttpServer(ServerOptions&& options)
-:   Server(std::move(options)) {
+:   Server{std::move(options)} {
     create_connection([this]() {
         return std::make_shared<HttpConnection>(this, counter_++); });
 }
@@ -240,18 +330,56 @@ void HttpServer::add_route(HttpRoute&& route) {
     routes_.emplace_back(route);
 }
 
-bool route_matches(const HttpRequest& request, const HttpRoute& route) {
-    return route.path == request.url();
-}
-
-void HttpServer::call_handler(const HttpRequest& request, HttpConnection* bind) {
+void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
     for (auto&& route : routes_) {
-        if (route_matches(request, route)) {
-            HttpOutput out(bind);
-            route.handler(request, out);
+        auto matches = route.match(request.url());
+        if (!matches.empty()) {
+            HttpResponse out{bind};
+            request.set_match(matches);
+            route.call_handler(request, out);
             out.close();
         }
     }
+}
+
+String match1_filename(const HttpRequest& req) {
+   return req.match()[1].str();
+}
+
+HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
+    String dir = root_dir;
+    return HttpRoute::Handler{
+        [request2file{std::move(request2file)}, dir{std::move(dir)}]
+        (const HttpRequest& req, HttpResponse& out)->void
+    {
+        uv_fs_t open_req;
+        const auto filename = request2file(req);
+        uv_fs_open(nullptr, &open_req, path_join(dir, filename).c_str(), O_RDONLY, _S_IREAD, nullptr);
+        auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
+        const auto fd = static_cast<uv_file>(open_req.result);
+
+        if (fd < 0) {
+            out.response(404);
+            return;
+        }
+
+        uv_fs_t read_req;
+        const size_t alloc_block = 4096;
+        char mem[alloc_block];
+        while (true) {
+            uv_buf_t buf[] = {uv_buf_init(mem, sizeof(mem))};
+            int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
+            auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
+            out.body(buf[0].base, read);
+            if (static_cast<unsigned int>(read) < buf[0].len) {
+                break;
+            }
+        }
+
+        uv_fs_t close_req;
+        uv_fs_close(nullptr, &close_req, fd, nullptr);
+        auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
+    }};
 }
 
 } // namespace enji

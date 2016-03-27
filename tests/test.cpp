@@ -1,21 +1,14 @@
 #include <enji/http.h>
+#include <gtest/gtest.h>
 
 using namespace enji;
 
-void index(const HttpRequest& req, HttpOutput& out) {
-    out.add_headers({
-        { "Content-Type", "text/html; charset=utf-8" },
-    });
-    out.body("Hello, world!\n");
+TEST(common, path_join) {
+    ASSERT_EQ("a/b/c", path_join("a", "b", "c"));
 }
 
 int main(int argc, char* argv[]) {
-    ServerOptions opts;
-    opts.port = 3001;
-    HttpServer server(std::move(opts));
-    server.routes({ 
-        { "/", index },
-    });
-    server.run();
-    return 0;
+    ::testing::InitGoogleTest(&argc, argv);
+    int result = RUN_ALL_TESTS();
+    return result;
 }

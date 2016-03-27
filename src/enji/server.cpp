@@ -32,7 +32,6 @@ void cb_after_shutdown(uv_shutdown_t* shutdown, int status) {
 }
 
 void cb_alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-    //std::cout << "Callback alloc " << suggested_size << std::endl;
     buf->base = new char[suggested_size];
     buf->len = size_t(suggested_size);
 }
@@ -114,30 +113,28 @@ void Server::on_loop() {
 
 void Server::queue_read(Connection* conn, OweMem mem_block) {
     if (base_options_.worker_threads == 1) {
-        conn->handle_input(StringView{ mem_block.data, ssize_t(mem_block.size) });
+        conn->handle_input(StringView{mem_block.data, ssize_t(mem_block.size)});
         delete[] mem_block.data;
     }
     else {
-        input_queue_.push(SignalEvent{ conn, mem_block, READ });
-        //or
-        //uv_queue_work(proc_->loop(), work_req, on_work_cb, on_after_work_cb);
+        input_queue_.push(SignalEvent{conn, mem_block, READ});
     }
 }
 
 void Server::queue_write(Connection* conn, OweMem mem_block) {
-    output_queue_.push(SignalEvent{ conn, mem_block, WRITE });
+    output_queue_.push(SignalEvent{conn, mem_block, WRITE});
 }
 
 void Server::queue_close(Connection* conn) {
-    output_queue_.push(SignalEvent{ conn, OweMem{}, CLOSE });
+    output_queue_.push(SignalEvent{conn, OweMem{}, CLOSE});
 }
 
 void Server::queue_confirmed_close(Connection* conn) {
-    output_queue_.push(SignalEvent{ conn, OweMem{}, RequestSignalType::CLOSE_CONFIRMED });
+    output_queue_.push(SignalEvent{conn, OweMem{}, RequestSignalType::CLOSE_CONFIRMED});
 }
 
 EventLoop::EventLoop(uv_stream_t* server)
-:   server_(server) {
+:   server_{server} {
     uv_loop_t* loop = new uv_loop_t;
     UVCHECK(uv_loop_init(loop),
         std::runtime_error, "Can't init event loop");
@@ -148,7 +145,7 @@ EventLoop::EventLoop(uv_stream_t* server)
 }
 
 EventLoop::EventLoop(uv_stream_t* server, uv_loop_t* loop)
-:   server_(server) {
+:   server_{server} {
     loop_.reset(loop, [](uv_loop_t* loop) {
         uv_loop_close(loop);
         delete loop;
@@ -161,9 +158,9 @@ void EventLoop::run() {
 }
 
 Connection::Connection(Server* parent, size_t id)
-:   base_parent_(parent),
-    id_(id) {
-    uv_tcp_t* stream = new uv_tcp_t;
+:   base_parent_{parent},
+    id_{id} {
+    uv_tcp_t* stream = new uv_tcp_t{};
     stream_.reset(reinterpret_cast<uv_stream_t*>(stream));
     UVCHECK(uv_tcp_init(base_parent_->event_loop()->loop(), stream),
         std::runtime_error, "Can't init tcp in Connection");
@@ -197,8 +194,7 @@ void on_after_work_cb(uv_work_t* req, int status) {
 }
 
 void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
-    log() << "read bytes " << nread << std::endl;
-
+    std::cout << String(buf->base, buf->base + nread);
     if (nread > 0) {
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
         base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
@@ -213,9 +209,9 @@ void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     }
 
     if (nread < 0) {
-        //parent_->output_queue_.push(SignalEvent{this, uv_buf_t{}, RequestSignalType::INPUT_EOF});
-        /*assert(nread == UV_EOF);*/
-        log() << "err: " << uv_strerror(int(nread)) << "\n";
+        //
+        // FIXME: Write properly status == UV_EOF
+        //
 
         auto shutdown = new uv_shutdown_t;
         shutdown->data = this;
@@ -231,17 +227,11 @@ void Connection::on_after_write(uv_write_t* req, int status) {
     UVCHECK(status,
         std::runtime_error, "Bad status of write operation");
 
-//    if (status == 0)
-//        return;
-//
-//    fprintf(stderr, "uv_write error: %s\n", uv_strerror(status));
-//
-//    if (status == UV_ECANCELED)
-//        return;
-//
-//    assert(status == UV_EPIPE);
+    //
+    // FIXME: Write properly status == 0, UV_ECANCELED, error
+    //
+
     if (write_result->close) {
-        log() << "close" << "\n";
         uv_close((uv_handle_t*) req->handle, cb_close);
     }
 
@@ -252,9 +242,9 @@ void Connection::on_after_write(uv_write_t* req, int status) {
 void Connection::on_after_shutdown(uv_shutdown_t* shutdown, int status) {
     UVCHECK(status,
         std::runtime_error, "Bad status of shutdown operation");
-    if (status < 0) {
-        log() << "err " << uv_strerror(status) << "\n";
-    }
+    //
+    // FIXME: Write properly status < 0
+    //
 
     uv_close((uv_handle_t*) shutdown->handle, cb_close);
     delete shutdown;
@@ -267,6 +257,15 @@ void Connection::notify_closed() {
 
 void Connection::write_chunk(OweMem mem_block) {
     base_parent_->queue_write(this, mem_block);
+}
+
+void Connection::write_chunk(std::ostringstream& buf) {
+    auto&& str = buf.str();
+    auto size = str.size();
+    char* data = new char[size];
+    std::memcpy(data, &str.front(), size);
+    OweMem mem_block{data, size};
+    write_chunk(mem_block);
 }
 
 void Connection::close() {

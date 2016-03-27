@@ -1,12 +1,24 @@
 #pragma once
 
 #include <http_parser.h>
-
+#include <regex>
 #include "server.h"
 
 namespace enji {
 
 class HttpConnection;
+
+class File {
+public:
+    const String& name() const { return name_; }
+    const String& filename() const { return filename_; }
+    const String& body() const { return body_; }
+
+public:
+    String name_;
+    String filename_;
+    String body_;
+};
 
 class HttpRequest {
 public:
@@ -16,25 +28,36 @@ public:
 
     const String& body() const { return body_; }
 
+    const std::vector<File>& files() const { return files_; }
+
+    void set_match(const std::smatch& match) { match_ = match; }
+    const std::smatch& match() const { return match_; }
+
 private:
     String method_;
     String url_;
     bool url_ready_;
 
+    std::smatch match_;
+
     std::multimap<String, String> headers_;
 
     String body_;
+
+    std::vector<File> files_;
 };
 
-class HttpOutput {
+class HttpResponse {
 public:
-    HttpOutput(HttpConnection* conn);
-    ~HttpOutput();
+    HttpResponse(HttpConnection* conn);
+    ~HttpResponse();
 
-    HttpOutput& response(int code=200);
-    HttpOutput& add_headers(std::vector<std::pair<String, String>> headers);
-    HttpOutput& add_header(const String& name, const String& value);
-    HttpOutput& body(const String& value);
+    HttpResponse& response(int code=200);
+    HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
+    HttpResponse& add_header(const String& name, const String& value);
+    HttpResponse& body(const String& value);
+    HttpResponse& body(std::stringstream&& buf);
+    HttpResponse& body(const void* data, size_t length);
 
     void flush();
     void close();
@@ -53,8 +76,8 @@ private:
 
 struct HttpRoute {
 public:
-    typedef void (*FuncHandler)(const HttpRequest&, HttpOutput&);
-    typedef std::function<void(const HttpRequest&, HttpOutput&)> Handler;
+    typedef void (*FuncHandler)(const HttpRequest&, HttpResponse&);
+    typedef std::function<void (const HttpRequest&, HttpResponse&)> Handler;
 
     HttpRoute(const char* path, Handler handler);
     HttpRoute(String&& path, Handler handler);
@@ -62,12 +85,17 @@ public:
     HttpRoute(const char* path, FuncHandler handler);
     HttpRoute(String&& path, FuncHandler handler);
 
-    //protected:
-public:
-    String method;
-    String name;
-    String path;
-    Handler handler;
+    std::smatch match(const String& url) const;
+
+    void call_handler(const HttpRequest&, HttpResponse&);
+
+private:
+    String method_;
+    String name_;
+    String path_;
+    Handler handler_;
+
+    std::regex path_match_;
 };
 
 class HttpServer : public Server {
@@ -79,7 +107,7 @@ public:
     std::vector<HttpRoute>& routes() { return routes_; }
     const std::vector<HttpRoute>& routes() const { return routes_; }
 
-    void call_handler(const HttpRequest& request, HttpConnection* bind);
+    void call_handler(HttpRequest& request, HttpConnection* bind);
 
 protected:
     std::vector<HttpRoute> routes_;
@@ -101,7 +129,7 @@ public:
 
     int on_http_headers_complete();
 
-    int on_http_body();
+    int on_http_body(const char* at, size_t len);
     int on_message_complete();
 
     void check_header_finished();
@@ -118,5 +146,10 @@ private:
     RHeader read_header_;
     bool message_completed_ = false;
 };
+
+
+String match1_filename(const HttpRequest& req);
+
+HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file);
 
 } // namespace enji
