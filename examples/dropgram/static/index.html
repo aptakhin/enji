@@ -8,8 +8,31 @@
   <title>Dropgram</title>
 
   <link href="/static/bootstrap.min.css" rel="stylesheet">
+  <script src="/static/jquery-2.2.2.min.js"></script>
+
+  <script>
+    $(document).ready(function() {
+      $.getJSON("/api/view", function(resp) {
+
+      var content = "";
+      for (var key in resp.grams) {
+        var value = resp.grams[key];
+        content += '<h1>27.03.2016 by you</h1> <img src="' + value.filename + '" width="600">';
+        console.log(value);
+      }
+
+      var container = $("#content");
+      container.html(content);
+    });
+   });
+  </script>
 </head>
 <body>
-  <h1>Hello, world!</h1>
+  <div class="page-header">
+    <h1>Dropgram <small>Private social network with images near <code>/dev/null</code> <form enctype="multipart/form-data" method="post">
+   <input type="file" name="f"></form></small></h1>
+  </div>
+  <div style="text-align: center" id="content">
+  </div>
 </body>
 </html>

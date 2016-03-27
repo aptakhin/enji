@@ -244,7 +244,7 @@ HttpResponse& HttpResponse::body(const String& value) {
     return *this;
 }
 
-HttpResponse& HttpResponse::body(std::stringstream&& buf) {
+HttpResponse& HttpResponse::body(std::stringstream& buf) {
     stream2stream(body_, buf);
     return *this;
 }
@@ -352,12 +352,12 @@ String match1_filename(const HttpRequest& req) {
    return req.match()[1].str();
 }
 
-HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file) {
+HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config) {
     return HttpRoute::Handler{
-        [request2file{std::move(request2file)}]
+        [request2file{std::move(request2file)}, config]
         (const HttpRequest& req, HttpResponse& out)->void
     {
-        static_file(request2file(req), out);
+        static_file(request2file(req), out, config);
     }};
 }
 
@@ -367,14 +367,17 @@ HttpRoute::Handler serve_static(const String& root_dir, std::function<String(con
         [request2file{std::move(request2file)}, dir{std::move(dir)}]
     (const HttpRequest& req, HttpResponse& out)->void
     {
-        static_file(path_join(dir, request2file(req)), out);
+        response_file(path_join(dir, request2file(req)), out);
     }};
 }
 
 void static_file(const String& filename, HttpResponse& out, const Config& config) {
+    response_file(path_join(config["STATIC_ROOT_DIR"].str(), filename), out);
+}
+
+void response_file(const String& filename, HttpResponse& out) {
     uv_fs_t open_req;
-    const auto open_filename = path_join(config["STATIC_ROOT_DIR"].str(), filename);
-    uv_fs_open(nullptr, &open_req, open_filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
+    uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
     auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
     const auto fd = static_cast<uv_file>(open_req.result);
 

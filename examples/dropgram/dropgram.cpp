@@ -1,22 +1,83 @@
 #include <enji/http.h>
 
+#include <iomanip>
 #include <stdio.h>
 #include <sqlite3.h>
 
 using namespace enji;
 
 sqlite3* db;
+String WEBCACHE_DIR;
 
 void index(const HttpRequest& req, HttpResponse& out) {
     static_file("index.html", out);
 }
 
-void api_upload(const HttpRequest& req, HttpResponse& out) {
+int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
+    auto values = reinterpret_cast<Value*>(values_ptr);
+    auto row = Value{std::map<Value, Value>{}};
+    for (int i = 0; i < argc; i++) {
+        if (argv[i]) {
+            row[col_name[i]] = argv[i];
+        }
+    }
+    values->array().push_back(row);
+    return 0;
+}
 
+void api_view(const HttpRequest& req, HttpResponse& out) {
+    char* err_msg = 0;
+    Value grams{std::vector<Value>{}};
+    sqlite3_exec(db, "SELECT * FROM grams;", select_callback, (void*)&grams, &err_msg);
+
+    std::stringstream grams_json;
+    grams_json << "{ " << std::quoted("grams") << ": [";
+
+    for (size_t row_iter = 0; row_iter < grams.array().size(); ++row_iter) {
+        Value& row = grams.array()[row_iter];
+        grams_json << "{";
+        grams_json << std::quoted("filename") << ": " << std::quoted(path_join("/", "gram", row["filename"].str()));
+        grams_json << "}";
+        if (row_iter + 1 < grams.array().size()) {
+            grams_json << ", ";
+        }
+    }
+
+    grams_json << "]}";
+    out.body(grams_json);
+}
+
+void api_upload(const HttpRequest& req, HttpResponse& out) {
+    char home[_MAX_PATH];
+    size_t home_size = sizeof(home);
+    uv_os_homedir(home, &home_size);
+
+    for (auto&& file : req.files()) {
+        std::ostringstream sql;
+
+        sql << "INSERT INTO grams (filename, published) VALUES ('";
+        sql << file.filename() << "', " << "datetime('now'));";
+        //
+        // FIXME: bind here
+        //
+
+        char* err_msg = 0;
+        sqlite3_exec(db, sql.str().c_str(), select_callback, 0, &err_msg);
+
+//std::runtime_error, "Can't insert into grams table");
+    }
 }
 
 int main(int argc, char* argv[]) {
     ServerConfig["STATIC_ROOT_DIR"] = path_join(path_dirname(__FILE__), "static");
+
+    char home_dir[_MAX_PATH];
+    size_t home_size = sizeof(home_dir);
+    uv_os_homedir(home_dir, &home_size);
+
+    WEBCACHE_DIR = path_join(home_dir, "dropgram");
+    uv_fs_t web_cache_dir_req;
+    uv_fs_mkdir(nullptr, &web_cache_dir_req, WEBCACHE_DIR.c_str(), 0, nullptr);
 
     ZEROCHECK(sqlite3_open("test.db", &db),
         std::runtime_error, "Can't open database");
@@ -24,12 +85,22 @@ int main(int argc, char* argv[]) {
 
     char* err_msg = 0;
 
+    auto sql = "CREATE TABLE IF NOT EXISTS grams ("  \
+        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," \
+        "filename CHAR(50)," \
+        "published DATETIME);";
+
+    ZEROCHECK(sqlite3_exec(db, sql, select_callback, 0, &err_msg),
+        std::runtime_error, "Can't create grams table");
+
     ServerOptions opts;
     opts.port = 3001;
     HttpServer server(std::move(opts));
     server.routes({
         {"^/$", index},
         {"^/static/(.+)$", serve_static(match1_filename)},
+        {"^/gram/(.+)$", serve_static(WEBCACHE_DIR, match1_filename)},
+        {"^/api/view", api_view},
         {"^/api/upload", api_upload},
     });
     server.run();

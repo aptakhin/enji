@@ -197,7 +197,7 @@ void on_after_work_cb(uv_work_t* req, int status) {
 
 void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     if (nread > 0) {
-        std::cout << String(buf->base, buf->base + nread);
+        //std::cout << String(buf->base, buf->base + nread);
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
         base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
     }

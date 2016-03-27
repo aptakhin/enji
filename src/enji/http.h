@@ -56,7 +56,7 @@ public:
     HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
     HttpResponse& add_header(const String& name, const String& value);
     HttpResponse& body(const String& value);
-    HttpResponse& body(std::stringstream&& buf);
+    HttpResponse& body(std::stringstream& buf);
     HttpResponse& body(const void* data, size_t length);
 
     void flush();
@@ -150,9 +150,10 @@ private:
 
 String match1_filename(const HttpRequest& req);
 
-HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file);
+HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config = ServerConfig);
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file);
 
 void static_file(const String& filename, HttpResponse& out, const Config& config = ServerConfig);
+void response_file(const String& filename, HttpResponse& out);
 
 } // namespace enji
