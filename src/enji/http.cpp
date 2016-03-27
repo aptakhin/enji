@@ -385,12 +385,14 @@ void static_file(const String& filename, HttpResponse& out, const Config& config
 
     uv_fs_t read_req;
     const size_t alloc_block = 4096;
+    size_t offset = 0;
     char mem[alloc_block];
     while (true) {
         uv_buf_t buf[] = {uv_buf_init(mem, sizeof(mem))};
-        int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, 0, nullptr);
+        int read = uv_fs_read(nullptr, &read_req, fd, buf, 1, offset, nullptr);
         auto read_req_exit = Defer{[&read_req] { uv_fs_req_cleanup(&read_req); }};
         out.body(buf[0].base, read);
+        offset += read;
         if (static_cast<unsigned int>(read) < buf[0].len) {
             break;
         }

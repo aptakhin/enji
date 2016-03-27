@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     HttpServer server(std::move(opts));
     server.routes({
         {"^/$", index},
-        //{"^/static/(.+)$", serve_static(match1_filename)},
+        {"^/static/(.+)$", serve_static(match1_filename)},
         {"^/api/upload", api_upload},
     });
     server.run();
