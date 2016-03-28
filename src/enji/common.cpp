@@ -180,7 +180,7 @@ bool operator == (const Value& a, const Value& b) {
 
     if (a.is_dict() && b.is_dict()) {
         auto u = a.dict();
-        auto v = a.dict();
+        auto v = b.dict();
         if (u.size() != v.size()) {
             return false;
         }
@@ -195,7 +195,7 @@ bool operator == (const Value& a, const Value& b) {
             return false;
         }
         auto u = a.array();
-        auto v = a.array();
+        auto v = b.array();
         if (u.size() != v.size()) {
             return false;
         }
