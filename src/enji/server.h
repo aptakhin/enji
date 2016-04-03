@@ -38,7 +38,7 @@ enum RequestSignalType {
 
 struct SignalEvent {
     Connection* conn;
-    OweMem buf;
+    TransferBlock buf;
     RequestSignalType signal;
 };
 
@@ -61,8 +61,8 @@ public:
 
     EventLoop* event_loop() { return event_loop_.get(); }
 
-    void queue_read(Connection* conn, OweMem mem_block);
-    void queue_write(Connection* conn, OweMem mem_block);
+    void queue_read(Connection* conn, TransferBlock mem_block);
+    void queue_write(Connection* conn, TransferBlock mem_block);
     void queue_close(Connection* conn);
     void queue_confirmed_close(Connection* conn);
 
@@ -93,7 +93,7 @@ public:
 
     virtual void handle_input(StringView data) {}
 
-    void write_chunk(OweMem mem_block);
+    void write_chunk(TransferBlock block);
     void write_chunk(std::ostringstream& buf);
 
     void close();

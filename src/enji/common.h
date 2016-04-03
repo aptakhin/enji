@@ -164,19 +164,17 @@ public:
     size_t size;
 };
 
-class OweMem {
-public:
-    OweMem();
+struct TransferBlock {
+    const char* data = nullptr;
+    size_t size = 0;
+    std::function<void (char*)> deleter = [] (char* ptr) { delete[] ptr; };
 
-    OweMem(const char* data, size_t size);
+    TransferBlock();
+    TransferBlock(const char* data, size_t size);
+    void free();
 
     void to_uv_buf(uv_buf_t* cpy);
-
-public:
-    const char* data;
-    size_t size;
 };
-
 
 template <typename Exc>
 void uvcheck(int resp_code, String&& enji_error, const char* file, int line) {

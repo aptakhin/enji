@@ -73,7 +73,7 @@ void Server::run() {
     UVCHECK(uv_idle_init(event_loop_->loop(), on_loop),
         std::runtime_error, "Can't init loop events handling");
     on_loop->data = this;
-    on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
+    //on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
     uv_idle_start(on_loop, cb_idle);
 
     threads_.push_back(std::thread{[](decltype(input_queue_) & input_queue) {
@@ -131,7 +131,7 @@ void Server::on_loop() {
     }
 }
 
-void Server::queue_read(Connection* conn, OweMem mem_block) {
+void Server::queue_read(Connection* conn, TransferBlock mem_block) {
     if (base_options_.worker_threads == 0) {
         conn->handle_input(StringView{mem_block.data, ssize_t(mem_block.size)});
         delete[] mem_block.data;
@@ -141,16 +141,16 @@ void Server::queue_read(Connection* conn, OweMem mem_block) {
     }
 }
 
-void Server::queue_write(Connection* conn, OweMem mem_block) {
-    output_queue_.push(SignalEvent{conn, mem_block, WRITE});
+void Server::queue_write(Connection* conn, TransferBlock block) {
+    output_queue_.push(SignalEvent{conn, block, WRITE});
 }
 
 void Server::queue_close(Connection* conn) {
-    output_queue_.push(SignalEvent{conn, OweMem{}, CLOSE});
+    output_queue_.push(SignalEvent{conn, TransferBlock{}, CLOSE});
 }
 
 void Server::queue_confirmed_close(Connection* conn) {
-    output_queue_.push(SignalEvent{conn, OweMem{}, RequestSignalType::CLOSE_CONFIRMED});
+    output_queue_.push(SignalEvent{conn, TransferBlock{}, RequestSignalType::CLOSE_CONFIRMED});
 }
 
 EventLoop::EventLoop(uv_stream_t* server)
@@ -217,7 +217,7 @@ void Connection::on_after_read(ssize_t nread, const uv_buf_t* buf) {
     if (nread > 0) {
         //std::cout << String(buf->base, buf->base + nread);
         uv_buf_t send_buf = uv_buf_init(buf->base, (unsigned int)nread);
-        base_parent_->queue_read(this, OweMem{ buf->base, size_t(nread) });
+        base_parent_->queue_read(this, TransferBlock{ buf->base, size_t(nread) });
     }
 
     if (nread <= 0) {
@@ -275,8 +275,8 @@ void Connection::notify_closed() {
     base_parent_->queue_confirmed_close(this);
 }
 
-void Connection::write_chunk(OweMem mem_block) {
-    base_parent_->queue_write(this, mem_block);
+void Connection::write_chunk(TransferBlock block) {
+    base_parent_->queue_write(this, block);
 }
 
 void Connection::write_chunk(std::ostringstream& buf) {
@@ -284,7 +284,7 @@ void Connection::write_chunk(std::ostringstream& buf) {
     auto size = str.size();
     char* data = new char[size];
     std::memcpy(data, &str.front(), size);
-    OweMem mem_block{data, size};
+    TransferBlock mem_block{data, size};
     write_chunk(mem_block);
 }
 

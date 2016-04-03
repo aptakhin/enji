@@ -6,7 +6,7 @@ public:
 
     void handle_input(enji::StringView data) override {
         std::cout << "Got " << enji::String(data.data, data.data + data.size) << std::endl;
-        auto mem = enji::OweMem{new char[data.size], data.size };
+        auto mem = enji::TransferBlock{new char[data.size], data.size };
         std::memcpy((void*)mem.data, data.data, data.size);
         write_chunk(mem);
     }

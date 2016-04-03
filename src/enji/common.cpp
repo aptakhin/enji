@@ -17,17 +17,23 @@ StringView::StringView(const char* data, ssize_t size)
     size{static_cast<size_t>(size)} {
 }
 
-OweMem::OweMem()
+TransferBlock::TransferBlock()
 :   data{nullptr},
     size{0} {
 }
 
-OweMem::OweMem(const char* data, size_t size)
+TransferBlock::TransferBlock(const char* data, size_t size)
 :   data{data},
     size{size} {
 }
 
-void OweMem::to_uv_buf(uv_buf_t* cpy) {
+void TransferBlock::free() {
+    if (data) {
+        deleter(const_cast<char*>(data));
+    }
+}
+
+void TransferBlock::to_uv_buf(uv_buf_t* cpy) {
     cpy->base = (char*) data;
     cpy->len = size_t(size);
 }

@@ -183,8 +183,7 @@ void HttpConnection::handle_input(StringView data) {
 
 void HttpConnection::check_header_finished() {
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
-        request_->headers_.insert(
-            Header{std::move(read_header_.first), std::move(read_header_.second)});
+        request_->headers_.insert(Header{std::move(read_header_)});
     }
 }
 
@@ -241,9 +240,9 @@ void stream2conn(Connection* conn, std::stringstream& buf) {
         size_t alloc_block = 32 * 1024;
         char* data = new char[alloc_block];
         buf.read(data, alloc_block);
-        size_t size = buf.gcount();
-        OweMem mem = {data, size};
-        conn->write_chunk(mem);
+        const size_t size = buf.gcount();
+        TransferBlock block = {data, size};
+        conn->write_chunk(block);
     }
 }
 
@@ -363,12 +362,11 @@ String match1_filename(const HttpRequest& req) {
 }
 
 HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config) {
-    auto request_func = std::function<String(const HttpRequest& req)>{std::move(request2file)};
+    //auto request_func = std::function<String(const HttpRequest& req)>{std::move(request2file)};
     return HttpRoute::Handler{
-        [&request_func, config]
-        (const HttpRequest& req, HttpResponse& out)->void
+        [&] (const HttpRequest& req, HttpResponse& out)
     {
-        static_file(request_func(req), out, config);
+        static_file(request2file(req), out, config);
     }};
 }
 
