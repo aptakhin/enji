@@ -1,7 +1,10 @@
 #include "http.h"
 #include <fcntl.h>
-#include <io.h>
 #include <fstream>
+
+#ifdef _WIN32
+#   include <io.h>
+#endif
 
 namespace enji {
 
@@ -360,21 +363,24 @@ String match1_filename(const HttpRequest& req) {
 }
 
 HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config) {
+    auto request_func = std::function<String(const HttpRequest& req)>{std::move(request2file)};
     return HttpRoute::Handler{
-        [request2file{std::move(request2file)}, config]
+        [&request_func, config]
         (const HttpRequest& req, HttpResponse& out)->void
     {
-        static_file(request2file(req), out, config);
+        static_file(request_func(req), out, config);
     }};
 }
 
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
     String dir = root_dir;
+    auto request_func = std::function<String(const HttpRequest& req)>{std::move(request2file)};
     return HttpRoute::Handler{
-        [request2file{std::move(request2file)}, dir{std::move(dir)}]
+        [&request_func, &dir]
     (const HttpRequest& req, HttpResponse& out)->void
     {
-        response_file(path_join(dir, request2file(req)), out);
+        String result = request_func(req);
+        response_file(path_join(dir, result), out);
     }};
 }
 
@@ -384,7 +390,7 @@ void static_file(const String& filename, HttpResponse& out, const Config& config
 
 void response_file(const String& filename, HttpResponse& out) {
     uv_fs_t open_req;
-    uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, _S_IREAD, nullptr);
+    uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, S_IRUSR, nullptr);
     auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
     const auto fd = static_cast<uv_file>(open_req.result);
 

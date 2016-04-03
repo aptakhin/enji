@@ -2,14 +2,21 @@ cmake_minimum_required(VERSION 2.8)
 project(ENJI)
 
 if (NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 endif()
 
 include_directories(src)
 include_directories(deps/include)
 
-find_library(LIBUV_LIBRARY_DEBUG libuv deps/lib/debug)
-find_library(LIBUV_LIBRARY_RELEASE libuv deps/lib/release)
+link_directories(deps/lib/debug)
+
+if (MSVC)
+    find_library(LIBUV_LIBRARY_DEBUG NAMES libuv PATHS ${CMAKE_SOURCE_DIR}/deps/lib/debug)
+    find_library(LIBUV_LIBRARY_RELEASE libuv PATHS ${CMAKE_SOURCE_DIR}/deps/lib/release)
+else()
+    find_library(LIBUV_LIBRARY_DEBUG NAMES libuv.a PATHS ${CMAKE_SOURCE_DIR}/deps/lib/debug NO_DEFAULT_PATH)
+    find_library(LIBUV_LIBRARY_RELEASE libuv.a PATHS ${CMAKE_SOURCE_DIR}/deps/lib/release NO_DEFAULT_PATH)
+endif()
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     set(LIBUV_LIBRARY ${LIBUV_LIBRARY_DEBUG})

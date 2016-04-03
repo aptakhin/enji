@@ -51,10 +51,6 @@ void api_view(const HttpRequest& req, HttpResponse& out) {
 }
 
 void api_upload(const HttpRequest& req, HttpResponse& out) {
-    char home[_MAX_PATH];
-    size_t home_size = sizeof(home);
-    uv_os_homedir(home, &home_size);
-
     for (auto&& file : req.files()) {
         std::ostringstream sql;
         
@@ -86,9 +82,10 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
 int main(int argc, char* argv[]) {
     ServerConfig["STATIC_ROOT_DIR"] = path_join(path_dirname(__FILE__), "static");
 
-    char home_dir[_MAX_PATH];
+    char home_dir[260];
     size_t home_size = sizeof(home_dir);
-    uv_os_homedir(home_dir, &home_size);
+    UVCHECK(uv_os_homedir(home_dir, &home_size),
+         std::runtime_error, "Can't get user home dir");
 
     WEBCACHE_DIR = path_join(home_dir, "dropgram");
     uv_fs_t web_cache_dir_req;
