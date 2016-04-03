@@ -388,7 +388,14 @@ void static_file(const String& filename, HttpResponse& out, const Config& config
 
 void response_file(const String& filename, HttpResponse& out) {
     uv_fs_t open_req;
-    uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, S_IRUSR, nullptr);
+
+#ifdef _WIN32
+    int open_mode = _S_IREAD;
+#else
+    int open_mode = S_IRUSR;
+#endif
+    
+    uv_fs_open(nullptr, &open_req, filename.c_str(), O_RDONLY, open_mode, nullptr);
     auto open_req_exit = Defer{[&open_req] { uv_fs_req_cleanup(&open_req); }};
     const auto fd = static_cast<uv_file>(open_req.result);
 
