@@ -48,7 +48,7 @@ public:
 
     Server(ServerOptions&& options);
 
-    virtual ~Server();
+    ~Server();
 
     void setup(ServerOptions&& options);
 
@@ -91,7 +91,7 @@ class Connection {
 public:
     Connection(Server* parent, size_t id);
 
-    virtual void handle_input(StringView data) {}
+    virtual void handle_input(TransferBlock data) {}
 
     void write_chunk(TransferBlock block);
     void write_chunk(std::ostringstream& buf);

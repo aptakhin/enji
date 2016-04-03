@@ -125,7 +125,7 @@ class HttpConnection : public Connection {
 public:
     HttpConnection(HttpServer* parent, size_t id);
 
-    void handle_input(StringView data) override;
+    void handle_input(TransferBlock data) override;
 
     const HttpRequest& request() const;
 

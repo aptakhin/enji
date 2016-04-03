@@ -30,7 +30,8 @@ int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
 void api_view(const HttpRequest& req, HttpResponse& out) {
     char* err_msg = 0;
     auto grams = Value::make_array();
-    sqlite3_exec(db, "SELECT * FROM grams;", select_callback, (void*)&grams, &err_msg);
+    ZEROCHECK(sqlite3_exec(db, "SELECT * FROM grams;", select_callback, (void*)&grams, &err_msg),
+        std::runtime_error, "Can't select grams", &err_msg);
 
     std::stringstream grams_json;
     grams_json << "{ " << std::quoted("grams") << ": [";

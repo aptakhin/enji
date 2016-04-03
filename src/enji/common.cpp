@@ -12,11 +12,6 @@ void Thread::run(Func&& thread_func) {
     uv_thread_create(&thread_, run_thread, this);
 }
 
-StringView::StringView(const char* data, ssize_t size)
-:   data{data},
-    size{static_cast<size_t>(size)} {
-}
-
 TransferBlock::TransferBlock()
 :   data{nullptr},
     size{0} {

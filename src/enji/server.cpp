@@ -10,7 +10,7 @@ Server::Server(ServerOptions&& opts) {
     setup(std::move(opts));
 }
 
-Server::~Server() {}
+Server::~Server() { }
 
 void cb_on_connection(uv_stream_t* stream, int status) {
     Server& server = *reinterpret_cast<Server*>(stream->data);
@@ -73,7 +73,7 @@ void Server::run() {
     UVCHECK(uv_idle_init(event_loop_->loop(), on_loop),
         std::runtime_error, "Can't init loop events handling");
     on_loop->data = this;
-    //on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
+    on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
     uv_idle_start(on_loop, cb_idle);
 
     threads_.push_back(std::thread{[](decltype(input_queue_) & input_queue) {
@@ -81,7 +81,7 @@ void Server::run() {
         while (true) {
             try {
                 if (input_queue.pop(msg)) {
-                    msg.conn->handle_input(StringView{msg.buf.data, ssize_t(msg.buf.size)});
+                    msg.conn->handle_input(TransferBlock{msg.buf.data, size_t(msg.buf.size)});
                     delete[] msg.buf.data;
                 }
             }
@@ -120,8 +120,7 @@ void Server::on_loop() {
             }
             UVCHECK(uv_write(&wr->req, msg.conn->sock(), &wr->buf, 1, cb_after_write),
                 std::runtime_error, "Can't write data");
-        }
-        else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
+        } else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
             Connection* remove_conn = msg.conn;
             auto found = std::find_if(connections_.begin(), connections_.end(),
                 [remove_conn](std::shared_ptr<Connection> req) {
@@ -131,13 +130,12 @@ void Server::on_loop() {
     }
 }
 
-void Server::queue_read(Connection* conn, TransferBlock mem_block) {
+void Server::queue_read(Connection* conn, TransferBlock block) {
     if (base_options_.worker_threads == 0) {
-        conn->handle_input(StringView{mem_block.data, ssize_t(mem_block.size)});
-        delete[] mem_block.data;
-    }
-    else {
-        input_queue_.push(SignalEvent{conn, mem_block, READ});
+        conn->handle_input(block);
+        block.free();
+    } else {
+        input_queue_.push(SignalEvent{conn, block, READ});
     }
 }
 

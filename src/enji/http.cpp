@@ -167,12 +167,11 @@ int HttpConnection::on_message_complete() {
             request_->files_.emplace_back(std::move(file));
         }
     }
-   
 
     return 0;
 }
 
-void HttpConnection::handle_input(StringView data) {
+void HttpConnection::handle_input(TransferBlock data) {
     http_parser_execute(parser_.get(), &get_http_settings(), data.data, data.size);
     
     if (message_completed_) {

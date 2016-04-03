@@ -155,15 +155,6 @@ struct WriteContext {
     bool close = false;
 };
 
-class StringView {
-public:
-    StringView(const char* data, ssize_t size);
-
-public:
-    const char* data;
-    size_t size;
-};
-
 struct TransferBlock {
     const char* data = nullptr;
     size_t size = 0;
