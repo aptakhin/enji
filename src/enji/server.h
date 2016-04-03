@@ -12,8 +12,6 @@ struct ServerOptions {
     int worker_threads = 1;
 };
 
-typedef std::pair<String, String> Header;
-
 class EventLoop {
 public:
     EventLoop(uv_stream_t* server);

@@ -1,10 +1,8 @@
 #include <enji/http.h>
 #include <gtest/gtest.h>
 
-using namespace enji;
-
 TEST(common, path_join) {
-    ASSERT_EQ("a/b/c", path_join("a", "b", "c"));
+    ASSERT_EQ("a/b/c", enji::path_join("a", "b", "c"));
 }
 
 int main(int argc, char* argv[]) {

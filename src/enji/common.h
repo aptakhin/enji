@@ -248,7 +248,7 @@ public:
     typedef typename ContB::value_type ValB;
 
     Zip(ContA& a, ContB& b)
-        : begin_(a.begin(), b.begin()),
+    :   begin_(a.begin(), b.begin()),
         end_(a.end(), b.end()) {
     }
 
@@ -258,7 +258,7 @@ public:
         friend class Zip;
 
         Iter(IterA ait, IterB bit)
-            : ait_(ait), bit_(bit) {}
+        :   ait_(ait), bit_(bit) {}
 
     public:
         Iter& operator ++() {
@@ -298,7 +298,7 @@ private:
 
 template <typename ContA, typename ContB>
 Zip<ContA, ContB> zip(ContA& a, ContB& b) {
-    return{a, b};
+    return {a, b};
 }
 
 enum class ValueType {

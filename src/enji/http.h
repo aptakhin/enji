@@ -8,6 +8,8 @@ namespace enji {
 
 class HttpConnection;
 
+typedef std::pair<String, String> Header;
+
 class File {
 public:
     const String& name() const { return name_; }
@@ -25,6 +27,7 @@ public:
     friend class HttpConnection;
 
     const String& method() const { return method_; }
+
     const String& url() const { return url_; }
 
     const String& body() const { return body_; }

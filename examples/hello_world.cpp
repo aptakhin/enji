@@ -1,8 +1,6 @@
 #include <enji/http.h>
 
-using namespace enji;
-
-void index(const HttpRequest& req, HttpResponse& out) {
+void index(const enji::HttpRequest& req, enji::HttpResponse& out) {
     out.add_headers({
         { "Content-Type", "text/html; charset=utf-8" },
     });
@@ -10,9 +8,9 @@ void index(const HttpRequest& req, HttpResponse& out) {
 }
 
 int main(int argc, char* argv[]) {
-    ServerOptions opts;
+    enji::ServerOptions opts;
     opts.port = 3001;
-    HttpServer server(std::move(opts));
+    enji::HttpServer server(std::move(opts));
     server.routes({
         { "/", index },
     });
