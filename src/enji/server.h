@@ -9,7 +9,7 @@ class Connection;
 struct ServerOptions {
     String host;
     int port;
-    int worker_threads = 1;
+    int worker_threads = 0;
 };
 
 class EventLoop {

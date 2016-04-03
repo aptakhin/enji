@@ -109,6 +109,7 @@ int main(int argc, char* argv[]) {
 
     ServerOptions opts;
     opts.port = 3001;
+    opts.worker_threads = 4;
     HttpServer server(std::move(opts));
     server.routes({
         {"^/$", index},

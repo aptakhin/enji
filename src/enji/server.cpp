@@ -76,6 +76,24 @@ void Server::run() {
     on_loop_.reset(on_loop, [](uv_idle_t* idle) { uv_idle_stop(idle); delete idle; });
     uv_idle_start(on_loop, cb_idle);
 
+    threads_.push_back(std::thread{[](decltype(input_queue_) & input_queue) {
+        SignalEvent msg;
+        while (true) {
+            try {
+                if (input_queue.pop(msg)) {
+                    msg.conn->handle_input(StringView{msg.buf.data, ssize_t(msg.buf.size)});
+                    delete[] msg.buf.data;
+                }
+            }
+            catch (std::exception& e) {
+                std::cerr << "Exception in worker: " << e.what() << std::endl;
+            }
+            catch (...) {
+                std::cerr << "Unknown exception in worker thread" << std::endl;
+            }
+        }
+    }, std::ref(input_queue_)});
+
     event_loop_->run();
 }
 
@@ -114,7 +132,7 @@ void Server::on_loop() {
 }
 
 void Server::queue_read(Connection* conn, OweMem mem_block) {
-    if (base_options_.worker_threads == 1) {
+    if (base_options_.worker_threads == 0) {
         conn->handle_input(StringView{mem_block.data, ssize_t(mem_block.size)});
         delete[] mem_block.data;
     }
