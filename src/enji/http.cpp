@@ -362,18 +362,20 @@ String match1_filename(const HttpRequest& req) {
 
 HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config) {
     return HttpRoute::Handler{
-        [&] (const HttpRequest& req, HttpResponse& out)
+        [request2file_bind{request2file}, config_bind{config}]
+        (const HttpRequest& req, HttpResponse& out) 
     {
-        static_file(request2file(req), out, config);
+        static_file(request2file_bind(req), out, config_bind);
     }};
 }
 
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
     return HttpRoute::Handler{
-        [&] (const HttpRequest& req, HttpResponse& out)
+        [root_dir_bind{root_dir}, request2file_bind{request2file}]
+        (const HttpRequest& req, HttpResponse& out) 
     {
-        const auto request_file = request2file(req);
-        response_file(path_join(root_dir, request_file), out);
+        const auto request_file = request2file_bind(req);
+        response_file(path_join(root_dir_bind, request_file), out);
     }};
 }
 
