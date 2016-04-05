@@ -315,8 +315,14 @@ void HttpRoute::call_handler(const HttpRequest& req, HttpResponse& out) {
     handler_(req, out);
 }
 
-HttpServer::HttpServer(ServerOptions&& options)
-:   Server{std::move(options)} {
+HttpServer::HttpServer()
+:   Server{} {
+    create_connection([this]() {
+        return std::make_shared<HttpConnection>(this, counter_++); });
+}
+
+HttpServer::HttpServer(Config& config)
+:   Server{config} {
     create_connection([this]() {
         return std::make_shared<HttpConnection>(this, counter_++); });
 }

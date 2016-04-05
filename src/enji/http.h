@@ -108,7 +108,8 @@ private:
 
 class HttpServer : public Server {
 public:
-    HttpServer(ServerOptions&& options);
+    HttpServer();
+    HttpServer(Config& config);
 
     void routes(std::vector<HttpRoute>&& routes);
     void add_route(HttpRoute&& route);

@@ -72,6 +72,10 @@ Value::Value(double real)
 :   type_(ValueType::REAL),
     real_(real) {}
 
+Value::Value(int integer)
+:   type_(ValueType::INTEGER),
+    integer_(integer) {}
+
 Value::Value(String str)
 :   type_(ValueType::STR),
     str_(str) {}
@@ -106,6 +110,12 @@ double& Value::real() {
     return real_;
 }
 
+int& Value::integer() {
+    if (type_ != ValueType::INTEGER)
+        throw std::logic_error("Value is not a real!");
+    return integer_;
+}
+
 String& Value::str() {
     if (type_ != ValueType::STR)
         throw std::logic_error("Value is not a string!");
@@ -130,6 +140,12 @@ const double& Value::real() const {
     return real_;
 }
 
+const int& Value::integer() const {
+    if (type_ != ValueType::INTEGER)
+        throw std::logic_error("Value is not a integer!");
+    return integer_;
+}
+
 const String& Value::str() const {
     if (type_ != ValueType::STR)
         throw std::logic_error("Value is not a string!");
@@ -146,6 +162,10 @@ const std::vector<Value>* Value::is_array() const {
 
 const double* Value::is_real() const {
     return type_ == ValueType::REAL ? &real_ : nullptr;
+}
+
+const int* Value::is_integer() const {
+    return type_ == ValueType::INTEGER ? &integer_ : nullptr;
 }
 
 const String* Value::is_str() const {

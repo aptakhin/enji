@@ -297,6 +297,7 @@ enum class ValueType {
     DICT,
     ARRAY,
     REAL,
+    INTEGER,
     STR,
 };
 
@@ -305,7 +306,8 @@ public:
     Value();
     explicit Value(std::map<Value, Value> dict);
     explicit Value(std::vector<Value> arr);
-    Value(double d);
+    explicit Value(double d);
+    explicit Value(int d);
     Value(String str);
     Value(const char* str);
 
@@ -315,11 +317,13 @@ public:
     std::map<Value, Value>& dict();
     std::vector<Value>& array();
     double& real();
+    int& integer();
     String& str();
 
     const std::map<Value, Value>& dict() const;
     const std::vector<Value>& array() const;
     const double& real() const;
+    const int& integer() const;
     const String& str() const;
 
     Value& operator [] (const char* key);
@@ -328,6 +332,7 @@ public:
     const std::map<Value, Value>* is_dict() const;
     const std::vector<Value>* is_array() const;
     const double* is_real() const;
+    const int* is_integer() const;
     const String* is_str() const;
 
     ValueType type() const { return type_; }
@@ -338,6 +343,7 @@ private:
     std::map<Value, Value> dict_;
     std::vector<Value> array_;
     double real_;
+    int integer_;
     std::string str_;
 };
 

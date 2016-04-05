@@ -11,9 +11,9 @@ void upload_file(const enji::HttpRequest& req, enji::HttpResponse& out) {
 }
 
 int main(int argc, char* argv[]) {
-    enji::ServerOptions opts;
-    opts.port = 3001;
-    enji::HttpServer server(std::move(opts));
+    enji::ServerConfig["port"] = enji::Value{3001};
+    enji::ServerConfig["worker_threads"] = enji::Value{4};
+    enji::HttpServer server{enji::ServerConfig};
     server.routes({
         {"^/upload/(.+)$", upload_file},
     });

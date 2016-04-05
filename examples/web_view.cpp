@@ -6,9 +6,9 @@ int main(int argc, char* argv[]) {
     index_file << "<html><h2>Hello world!</h2>From index.html</html>";
     index_file.close();
 
-    enji::ServerOptions opts;
-    opts.port = 3001;
-    enji::HttpServer server(std::move(opts));
+    enji::ServerConfig["port"] = enji::Value{3001};
+    enji::ServerConfig["worker_threads"] = enji::Value{4};
+    enji::HttpServer server{enji::ServerConfig};
     server.routes({
         {"^/(.+)$", enji::serve_static(".", enji::match1_filename)},
     });

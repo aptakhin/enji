@@ -47,15 +47,28 @@ struct ConnEvent {
     ConnEvent(Connection* conn, ConnEventType ev, TransferBlock buf);
 };
 
+class Config {
+public:
+    Config();
+
+    Value& operator [] (const char* key) { return root_[key]; }
+    const Value& operator [] (const char* key) const { return root_[key]; }
+
+private:
+    Value root_;
+};
+
+extern Config ServerConfig;
+
 class Server {
 public:
     Server();
 
-    Server(ServerOptions&& options);
+    Server(Config& config);
 
     ~Server();
 
-    void setup(ServerOptions&& options);
+    void setup(Config& config);
 
     void run();
 
@@ -76,7 +89,7 @@ private:
     friend void cb_idle(uv_idle_t*);
     
 protected:
-    ServerOptions base_options_;
+    Config& config_;
 
     std::unique_ptr<EventLoop> event_loop_;
 
@@ -139,18 +152,5 @@ protected:
 
     bool is_closing_ = false;
 };
-
-class Config {
-public:
-    Config();
-
-    Value& operator [] (const char* key) { return root_[key]; }
-    const Value& operator [] (const char* key) const { return root_[key]; }
-
-private:
-    Value root_;
-};
-
-extern Config ServerConfig;
 
 } // namespace enji

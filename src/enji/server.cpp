@@ -15,10 +15,13 @@ ConnEvent::ConnEvent(Connection* conn, ConnEventType ev, TransferBlock buf)
     buf(buf) {
 }
 
-Server::Server() { }
+Server::Server()
+:   config_(ServerConfig) {
+}
 
-Server::Server(ServerOptions&& opts) {
-    setup(std::move(opts));
+Server::Server(Config& config)
+:   config_(config) {
+    setup(config);
 }
 
 Server::~Server() { }
@@ -54,11 +57,12 @@ void cb_after_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
     req.on_after_read(nread, buf);
 }
 
-void Server::setup(ServerOptions&& opts) {
-    base_options_ = std::move(opts);
+void Server::setup(Config& config) {
+    config_ = config;
+
     sockaddr_in addr;
 
-    UVCHECK(uv_ip4_addr("127.0.0.1", opts.port, &addr),
+    UVCHECK(uv_ip4_addr("127.0.0.1", config["port"].integer(), &addr),
         std::runtime_error, "Can't parse address to socketaddr");
 
     auto tcp_server = new uv_tcp_t;
@@ -142,7 +146,7 @@ void Server::on_loop() {
 }
 
 void Server::queue_read(Connection* conn, TransferBlock block) {
-    if (base_options_.worker_threads == 0) {
+    if (config_["worker_threads"].integer() == 0) {
         conn->handle_input(block);
         block.free();
     } else {

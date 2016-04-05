@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
     char home_dir[260];
     size_t home_size = sizeof(home_dir);
     UVCHECK(uv_os_homedir(home_dir, &home_size),
-         std::runtime_error, "Can't get user home dir");
+        std::runtime_error, "Can't get user home dir");
 
     WEBCACHE_DIR = path_join(home_dir, "dropgram");
     uv_fs_t web_cache_dir_req;
@@ -105,10 +105,9 @@ int main(int argc, char* argv[]) {
     ZEROCHECK(sqlite3_exec(db, sql, select_callback, 0, &err_msg),
         std::runtime_error, "Can't create grams table", &err_msg);
 
-    ServerOptions opts;
-    opts.port = 3001;
-    opts.worker_threads = 8;
-    HttpServer server(std::move(opts));
+    ServerConfig["port"] = Value{3001};
+    ServerConfig["worker_threads"] = Value{4};
+    HttpServer server{ServerConfig};
     server.routes({
         {"^/$", index},
         {"^/static/(.+)$", serve_static(match1_filename)},
