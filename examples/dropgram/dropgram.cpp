@@ -77,7 +77,7 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
             std::runtime_error, "Can't insert into grams", &err_msg);
     }
 
-    temporary_redirect("/", out);
+    shortcuts::temporary_redirect("/", out);
 }
 
 int main(int argc, char* argv[]) {
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
 
     ServerOptions opts;
     opts.port = 3001;
-    opts.worker_threads = 4;
+    opts.worker_threads = 8;
     HttpServer server(std::move(opts));
     server.routes({
         {"^/$", index},

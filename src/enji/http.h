@@ -129,6 +129,7 @@ public:
 
     const HttpRequest& request() const;
 
+private:
     int on_http_url(const char* at, size_t len);
 
     int on_http_header_field(const char* at, size_t len);
@@ -138,9 +139,19 @@ public:
     int on_http_headers_complete();
 
     int on_http_body(const char* at, size_t len);
+
     int on_message_complete();
 
     void check_header_finished();
+
+    friend int cb_http_message_begin(http_parser*);
+    friend int cb_http_url(http_parser*, const char*, size_t);
+    friend int cb_http_status(http_parser*, const char*, size_t);
+    friend int cb_http_header_field(http_parser*, const char*, size_t);
+    friend int cb_http_header_value(http_parser*, const char*, size_t);
+    friend int cb_http_headers_complete(http_parser*);
+    friend int cb_http_body(http_parser*, const char*, size_t);
+    friend int cb_http_message_complete(http_parser*);
 
 private:
     HttpServer* parent_;
@@ -163,8 +174,13 @@ HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> re
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file);
 
 void static_file(const String& filename, HttpResponse& out, const Config& config = ServerConfig);
+
 void response_file(const String& filename, HttpResponse& out);
 
-void temporary_redirect(const String& redirect_to, HttpResponse& out);
+namespace shortcuts {
+
+    void temporary_redirect(const String& redirect_to, HttpResponse& out);
+
+} // namespace shortcuts
 
 } // namespace enji

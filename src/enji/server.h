@@ -29,17 +29,22 @@ protected:
     uv_stream_t* server_;
 };
 
-enum RequestSignalType {
+enum class ConnEventType {
+    NONE,
     READ,
     WRITE,
     CLOSE,
     CLOSE_CONFIRMED,
 };
 
-struct SignalEvent {
-    Connection* conn;
+struct ConnEvent {
+    Connection* conn = nullptr;
+    ConnEventType ev = ConnEventType::NONE;
     TransferBlock buf;
-    RequestSignalType signal;
+
+    ConnEvent() {}
+    ConnEvent(Connection* conn, ConnEventType ev);
+    ConnEvent(Connection* conn, ConnEventType ev, TransferBlock buf);
 };
 
 class Server {
@@ -56,9 +61,6 @@ public:
 
     void create_connection(std::function<std::shared_ptr<Connection>()>);
 
-    virtual void on_connection(int status);
-    virtual void on_loop();
-
     EventLoop* event_loop() { return event_loop_.get(); }
 
     void queue_read(Connection* conn, TransferBlock mem_block);
@@ -66,6 +68,13 @@ public:
     void queue_close(Connection* conn);
     void queue_confirmed_close(Connection* conn);
 
+private:
+    virtual void on_connection(int status);
+    virtual void on_loop();
+
+    friend void cb_on_connection(uv_stream_t*, int);
+    friend void cb_idle(uv_idle_t*);
+    
 protected:
     ServerOptions base_options_;
 
@@ -75,8 +84,8 @@ protected:
 
     std::vector<std::shared_ptr<Connection>> connections_;
 
-    SafeQueue<SignalEvent> input_queue_;
-    SafeQueue<SignalEvent> output_queue_;
+    SafeQueue<ConnEvent> input_queue_;
+    SafeQueue<ConnEvent> output_queue_;
 
     std::vector<std::thread> threads_;
 
@@ -91,26 +100,35 @@ class Connection {
 public:
     Connection(Server* parent, size_t id);
 
-    virtual void handle_input(TransferBlock data) {}
-
     void write_chunk(TransferBlock block);
     void write_chunk(std::stringstream& buf);
 
     void close();
 
+    uv_stream_t* sock() { return stream_.get(); }
+
+protected:
+    std::ostream& log();
+
+private:
+    friend class Server;
+
     void accept();
+
+    virtual void handle_input(TransferBlock data) {}
 
     void on_after_read(ssize_t nread, const uv_buf_t* buf);
 
     void on_after_write(uv_write_t* req, int status);
     void on_after_shutdown(uv_shutdown_t* shutdown, int status);
-
     void notify_closed();
 
-    uv_stream_t* sock() { return stream_.get(); }
-
-protected:
-    std::ostream& log();
+    friend void cb_on_connection(uv_stream_t*, int);
+    friend void cb_close(uv_handle_t*);
+    friend void cb_after_write(uv_write_t*, int);
+    friend void cb_after_shutdown(uv_shutdown_t*, int);
+    friend void cb_alloc_buffer(uv_handle_t*, size_t, uv_buf_t*);
+    friend void cb_after_read(uv_stream_t*, ssize_t, const uv_buf_t*);
 
 protected:
     Server* base_parent_;

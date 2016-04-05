@@ -4,6 +4,17 @@ namespace enji {
 
 Config ServerConfig;
 
+ConnEvent::ConnEvent(Connection* conn, ConnEventType ev)
+:   conn(conn),
+    ev(ev) {
+}
+
+ConnEvent::ConnEvent(Connection* conn, ConnEventType ev, TransferBlock buf)
+:   conn(conn),
+    ev(ev),
+    buf(buf) {
+}
+
 Server::Server() { }
 
 Server::Server(ServerOptions&& opts) {
@@ -77,7 +88,7 @@ void Server::run() {
     uv_idle_start(on_loop, cb_idle);
 
     threads_.push_back(std::thread{[](decltype(input_queue_) & input_queue) {
-        SignalEvent msg;
+        ConnEvent msg;
         while (true) {
             try {
                 if (input_queue.pop(msg)) {
@@ -108,19 +119,19 @@ void Server::on_connection(int status) {
 }
 
 void Server::on_loop() {
-    SignalEvent msg;
+    ConnEvent msg;
     while (output_queue_.pop(msg)) {
-        if (msg.signal == RequestSignalType::WRITE || msg.signal == RequestSignalType::CLOSE) {
+        if (msg.ev == ConnEventType::WRITE || msg.ev == ConnEventType::CLOSE) {
             auto wr = new WriteContext{};
             wr->conn = msg.conn;
             msg.buf.to_uv_buf(&wr->buf);
             wr->req.data = wr->conn;
-            if (msg.signal == RequestSignalType::CLOSE) {
+            if (msg.ev == ConnEventType::CLOSE) {
                 wr->close = true;
             }
             UVCHECK(uv_write(&wr->req, msg.conn->sock(), &wr->buf, 1, cb_after_write),
                 std::runtime_error, "Can't write data");
-        } else if (msg.signal == RequestSignalType::CLOSE_CONFIRMED) {
+        } else if (msg.ev == ConnEventType::CLOSE_CONFIRMED) {
             Connection* remove_conn = msg.conn;
             auto found = std::find_if(connections_.begin(), connections_.end(),
                 [remove_conn](std::shared_ptr<Connection> req) {
@@ -135,20 +146,20 @@ void Server::queue_read(Connection* conn, TransferBlock block) {
         conn->handle_input(block);
         block.free();
     } else {
-        input_queue_.push(SignalEvent{conn, block, READ});
+        input_queue_.push(ConnEvent{conn, ConnEventType::READ, block});
     }
 }
 
 void Server::queue_write(Connection* conn, TransferBlock block) {
-    output_queue_.push(SignalEvent{conn, block, WRITE});
+    output_queue_.push(ConnEvent{conn, ConnEventType::WRITE, block});
 }
 
 void Server::queue_close(Connection* conn) {
-    output_queue_.push(SignalEvent{conn, TransferBlock{}, CLOSE});
+    output_queue_.push(ConnEvent{conn, ConnEventType::CLOSE});
 }
 
 void Server::queue_confirmed_close(Connection* conn) {
-    output_queue_.push(SignalEvent{conn, TransferBlock{}, RequestSignalType::CLOSE_CONFIRMED});
+    output_queue_.push(ConnEvent{conn, ConnEventType::CLOSE_CONFIRMED});
 }
 
 EventLoop::EventLoop(uv_stream_t* server)

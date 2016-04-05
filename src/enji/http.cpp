@@ -414,10 +414,14 @@ void response_file(const String& filename, HttpResponse& out) {
     auto close_req_exit = Defer{[&close_req] { uv_fs_req_cleanup(&close_req); }};
 }
 
-void temporary_redirect(const String& redirect_to, HttpResponse& out) {
-    out.response(307);
-    out.add_header("Location", redirect_to);
-    out.close();
-}
+namespace shortcuts {
+
+    void temporary_redirect(const String& redirect_to, HttpResponse& out) {
+        out.response(307);
+        out.add_header("Location", redirect_to);
+        out.close();
+    }
+
+} // namespace shortcuts
 
 } // namespace enji
