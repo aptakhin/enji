@@ -110,7 +110,7 @@ int HttpConnection::on_message_complete() {
     if (expect_iter != request_->headers_.end()) {
         if (expect_iter->second == "100-continue") {
             message_completed_ = false;
-            std::ostringstream buf;
+            std::stringstream buf;
             buf << "HTTP/1.1 100 Continue\r\n";
             write_chunk(buf);
         }
@@ -220,7 +220,7 @@ HttpResponse& HttpResponse::add_header(const String& name, const String& value) 
 }
 
 bool stream2stream(std::stringstream& output, std::stringstream& input) {
-    const size_t alloc_block = 32 * 1024;
+    const size_t alloc_block = 256 * 1024;
     char tmp[alloc_block];
     bool written_smth = false;
     while (input) {
@@ -235,14 +235,7 @@ bool stream2stream(std::stringstream& output, std::stringstream& input) {
 }
 
 void stream2conn(Connection* conn, std::stringstream& buf) {
-    while (buf) {
-        size_t alloc_block = 32 * 1024;
-        char* data = new char[alloc_block];
-        buf.read(data, alloc_block);
-        const size_t size = buf.gcount();
-        TransferBlock block = {data, size};
-        conn->write_chunk(block);
-    }
+    conn->write_chunk(buf);
 }
 
 HttpResponse& HttpResponse::body(const String& value) {

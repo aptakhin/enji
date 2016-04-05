@@ -277,7 +277,7 @@ void Connection::write_chunk(TransferBlock block) {
     base_parent_->queue_write(this, block);
 }
 
-void Connection::write_chunk(std::ostringstream& buf) {
+void Connection::write_chunk(std::stringstream& buf) {
     auto&& str = buf.str();
     auto size = str.size();
     char* data = new char[size];

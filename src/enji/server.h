@@ -94,7 +94,7 @@ public:
     virtual void handle_input(TransferBlock data) {}
 
     void write_chunk(TransferBlock block);
-    void write_chunk(std::ostringstream& buf);
+    void write_chunk(std::stringstream& buf);
 
     void close();
 
