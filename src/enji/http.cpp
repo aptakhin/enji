@@ -176,7 +176,14 @@ void HttpConnection::handle_input(TransferBlock data) {
     
     if (message_completed_) {
         request_->method_ = http_method_str(static_cast<http_method>(parser_.get()->method));
+        tp_parsed_ = std::chrono::high_resolution_clock::now();
         parent_->call_handler(*request_.get(), this);
+        tp_handled_ = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double> elapsed_seconds0 = tp_parsed_ - tp_accepted_;
+        std::chrono::duration<double> elapsed_seconds = tp_handled_ - tp_parsed_;
+
+        log() << "Times: " << elapsed_seconds0.count() << "s " << elapsed_seconds.count() << "s" << std::endl;
     }
 }
 
@@ -352,7 +359,7 @@ void HttpServer::call_handler(HttpRequest& request, HttpConnection* bind) {
         out.response(404);
     }
 
-    std::cout << request.method() << " " << request.url() << " " << out.code() << std::endl;
+    bind->log() << request.method() << " " << request.url() << " " << out.code() << std::endl;
 }
 
 String match1_filename(const HttpRequest& req) {

@@ -209,6 +209,8 @@ void Connection::accept() {
     UVCHECK(uv_accept(base_parent_->event_loop()->server(), stream_.get()),
         std::runtime_error, "Can't accept socket");
 
+    tp_accepted_ = std::chrono::high_resolution_clock::now();
+
     UVCHECK(uv_read_start(stream_.get(), cb_alloc_buffer, cb_after_read),
         std::runtime_error, "Can't start read");
 }
@@ -305,6 +307,10 @@ void Connection::close() {
     if (!is_closing_) {
         is_closing_ = true;
         base_parent_->queue_close(this);
+
+        const auto tp_finished = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = tp_finished - tp_accepted_;
+        log() << "Full time: " << elapsed_seconds.count() << std::endl;
     }
 }
 

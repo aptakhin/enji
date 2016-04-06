@@ -166,6 +166,10 @@ private:
     RHeader read_header_;
 
     bool message_completed_ = false;
+
+protected:
+    std::chrono::time_point<std::chrono::high_resolution_clock> tp_parsed_;
+    std::chrono::time_point<std::chrono::high_resolution_clock> tp_handled_;
 };
 
 

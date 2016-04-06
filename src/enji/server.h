@@ -120,7 +120,6 @@ public:
 
     uv_stream_t* sock() { return stream_.get(); }
 
-protected:
     std::ostream& log();
 
 private:
@@ -151,6 +150,9 @@ protected:
     size_t id_;
 
     bool is_closing_ = false;
+
+protected:
+    std::chrono::time_point<std::chrono::high_resolution_clock> tp_accepted_;
 };
 
 } // namespace enji
