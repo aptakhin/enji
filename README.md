@@ -17,4 +17,4 @@ Goal is to support 3 platforms: Linux, Mac, Windows. And compilers: Clang, GCC, 
 
 Small compiled core and header-only addons for server. No plans for HTTP2/SPDY-support, it's primarily backend server. May be SSL-encryption.
 
-Enji roadmap is [here](https://github.com/aptakhin/enji/blob/master/docs/roadmap.md).
+Enji roadmap is [here](https://github.com/aptakhin/enji/wiki/Roadmap).
