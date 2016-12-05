@@ -97,7 +97,7 @@ void Server::run() {
             try {
                 if (input_queue.pop(msg)) {
                     msg.conn->handle_input(TransferBlock{msg.buf.data, size_t(msg.buf.size)});
-                    delete[] msg.buf.data;
+                    msg.buf.free();
                 }
             }
             catch (std::exception& e) {

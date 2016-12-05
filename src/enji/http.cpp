@@ -250,7 +250,7 @@ HttpResponse& HttpResponse::body(const String& value) {
     return *this;
 }
 
-HttpResponse& HttpResponse::body(std::stringstream& buf) {
+HttpResponse& HttpResponse::body(std::stringstream buf) {
     stream2stream(body_, buf);
     return *this;
 }
@@ -367,15 +367,25 @@ String match1_filename(const HttpRequest& req) {
 }
 
 HttpRoute::Handler serve_static(std::function<String(const HttpRequest& req)> request2file, const Config& config) {
+#ifdef _MSVC
     return HttpRoute::Handler{
-        [request2file_bind{request2file}, config_bind{config}]
-        (const HttpRequest& req, HttpResponse& out) 
-    {
-        static_file(request2file_bind(req), out, config_bind);
-    }};
+            [request2file_bind{request2file}, config_bind{config}]
+            (const HttpRequest& req, HttpResponse& out)
+        {
+            static_file(request2file_bind(req), out, config_bind);
+        }};
+#else
+    return HttpRoute::Handler{
+        [&]
+        (const HttpRequest& req, HttpResponse& out) {
+            static_file(request2file(req), out, config);
+        }
+    };
+#endif
 }
 
 HttpRoute::Handler serve_static(const String& root_dir, std::function<String(const HttpRequest& req)> request2file) {
+#ifdef _MSVC
     return HttpRoute::Handler{
         [root_dir_bind{root_dir}, request2file_bind{request2file}]
         (const HttpRequest& req, HttpResponse& out) 
@@ -383,6 +393,15 @@ HttpRoute::Handler serve_static(const String& root_dir, std::function<String(con
         const auto request_file = request2file_bind(req);
         response_file(path_join(root_dir_bind, request_file), out);
     }};
+#else
+    return HttpRoute::Handler{
+        [&]
+        (const HttpRequest& req, HttpResponse& out)
+        {
+            const auto request_file = request2file(req);
+            response_file(path_join(root_dir, request_file), out);
+        }};
+#endif
 }
 
 void static_file(const String& filename, HttpResponse& out, const Config& config) {

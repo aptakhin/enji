@@ -1,6 +1,8 @@
 #include <enji/http.h>
 
-void index(const enji::HttpRequest& req, enji::HttpResponse& out) {
+using namespace enji;
+
+void index(const HttpRequest& req, HttpResponse& out) {
     out.add_headers({
         { "Content-Type", "text/html; charset=utf-8" },
     });
@@ -8,9 +10,9 @@ void index(const enji::HttpRequest& req, enji::HttpResponse& out) {
 }
 
 int main(int argc, char* argv[]) {
-    enji::ServerConfig["port"] = enji::Value{3001};
-    enji::ServerConfig["worker_threads"] = enji::Value{4};
-    enji::HttpServer server{enji::ServerConfig};
+    ServerConfig["port"] = 3001;
+    ServerConfig["worker_threads"] = 1;
+    HttpServer server{ServerConfig};
     server.routes({
         { "/", index },
     });
