@@ -72,7 +72,7 @@ public:
 
     void run();
 
-    void create_connection(std::function<std::shared_ptr<Connection>()>);
+    Server& create_connection(std::function<std::shared_ptr<Connection>()>);
 
     EventLoop* event_loop() { return event_loop_.get(); }
 

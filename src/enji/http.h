@@ -60,7 +60,7 @@ public:
     HttpResponse& add_headers(std::vector<std::pair<String, String>> headers);
     HttpResponse& add_header(const String& name, const String& value);
     HttpResponse& body(const String& value);
-    HttpResponse& body(std::stringstream buf);
+    HttpResponse& body(std::stringstream&& buf);
     HttpResponse& body(const void* data, size_t length);
 
     int code() const { return code_; }

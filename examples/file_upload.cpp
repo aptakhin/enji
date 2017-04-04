@@ -1,7 +1,12 @@
 #include <enji/http.h>
 #include <fstream>
 
-void upload_file(const enji::HttpRequest& req, enji::HttpResponse& out) {
+using enji::HttpRequest;
+using enji::HttpResponse;
+using enji::ServerConfig;
+using enji::HttpServer;
+
+void upload_file(const HttpRequest& req, HttpResponse& out) {
     for (auto&& file : req.files()) {
         std::stringstream buf;
         buf << "Got filename: " << file.filename() << 
@@ -11,9 +16,9 @@ void upload_file(const enji::HttpRequest& req, enji::HttpResponse& out) {
 }
 
 int main(int argc, char* argv[]) {
-    enji::ServerConfig["port"] = enji::Value{3001};
-    enji::ServerConfig["worker_threads"] = enji::Value{4};
-    enji::HttpServer server{enji::ServerConfig};
+    ServerConfig["port"] = 3001;
+    ServerConfig["worker_threads"] = 4;
+    HttpServer server{ServerConfig};
     server.routes({
         {"^/upload/(.+)$", upload_file},
     });

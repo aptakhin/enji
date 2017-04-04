@@ -1,6 +1,9 @@
 #include <enji/http.h>
 
-using namespace enji;
+using enji::ServerConfig;
+using enji::HttpRequest;
+using enji::HttpResponse;
+using enji::HttpServer;
 
 void index(const HttpRequest& req, HttpResponse& out) {
     out.add_headers({

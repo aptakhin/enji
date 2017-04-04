@@ -307,6 +307,7 @@ public:
     explicit Value(std::map<Value, Value> dict);
     explicit Value(std::vector<Value> arr);
     explicit Value(double d);
+
     Value(int d);
     Value(String str);
     Value(const char* str);

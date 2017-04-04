@@ -15,7 +15,7 @@ void index(const HttpRequest& req, HttpResponse& out) {
     static_file("index.html", out);
 }
 
-int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
+int sql_select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
     auto values = reinterpret_cast<Value*>(values_ptr);
     auto row = Value::make_dict();
     for (int i = 0; i < argc; i++) {
@@ -30,7 +30,7 @@ int select_callback(void* values_ptr, int argc, char** argv, char** col_name) {
 void api_view(const HttpRequest& req, HttpResponse& out) {
     char* err_msg = 0;
     auto grams = Value::make_array();
-    ZEROCHECK(sqlite3_exec(db, "SELECT * FROM grams;", select_callback, (void*)&grams, &err_msg),
+    ZEROCHECK(sqlite3_exec(db, "SELECT * FROM grams;", sql_select_callback, (void*)&grams, &err_msg),
         std::runtime_error, "Can't select grams", &err_msg);
 
     std::stringstream grams_json;
@@ -48,7 +48,7 @@ void api_view(const HttpRequest& req, HttpResponse& out) {
     }
 
     grams_json << "]}";
-    out.body(grams_json);
+    out.body(std::move(grams_json));
 }
 
 void api_upload(const HttpRequest& req, HttpResponse& out) {
@@ -56,7 +56,7 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
         std::ostringstream sql;
         
         std::ostringstream filename_buf;
-        std::time_t timestamp = std::time(nullptr);
+        const std::time_t timestamp = std::time(nullptr);
         filename_buf << std::hash<String>{}(file.filename()) << timestamp;
         filename_buf << "." << path_extension(file.filename());
 
@@ -73,7 +73,7 @@ void api_upload(const HttpRequest& req, HttpResponse& out) {
         //
 
         char* err_msg = 0;
-        ZEROCHECK(sqlite3_exec(db, sql.str().c_str(), select_callback, 0, &err_msg),
+        ZEROCHECK(sqlite3_exec(db, sql.str().c_str(), sql_select_callback, 0, &err_msg),
             std::runtime_error, "Can't insert into grams", &err_msg);
     }
 
@@ -102,11 +102,11 @@ int main(int argc, char* argv[]) {
         "filename CHAR(50)," \
         "published DATETIME);";
 
-    ZEROCHECK(sqlite3_exec(db, sql, select_callback, 0, &err_msg),
+    ZEROCHECK(sqlite3_exec(db, sql, sql_select_callback, 0, &err_msg),
         std::runtime_error, "Can't create grams table", &err_msg);
 
-    ServerConfig["port"] = Value{3001};
-    ServerConfig["worker_threads"] = Value{4};
+    ServerConfig["port"] = 3001;
+    ServerConfig["worker_threads"] = 4;
     HttpServer server{ServerConfig};
     server.routes({
         {"^/$", index},

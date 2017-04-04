@@ -8,6 +8,8 @@
 
 namespace enji {
 
+bool stream2stream(std::stringstream& output, std::stringstream&& input);
+
 int cb_http_message_begin(http_parser* parser) {
     return 0;
 }
@@ -180,14 +182,15 @@ void HttpConnection::handle_input(TransferBlock data) {
         parent_->call_handler(*request_.get(), this);
         tp_handled_ = std::chrono::high_resolution_clock::now();
 
-        std::chrono::duration<double> elapsed_seconds0 = tp_parsed_ - tp_accepted_;
-        std::chrono::duration<double> elapsed_seconds = tp_handled_ - tp_parsed_;
+        const std::chrono::duration<double> elapsed_seconds0 = tp_parsed_ - tp_accepted_;
+        const std::chrono::duration<double> elapsed_seconds = tp_handled_ - tp_parsed_;
 
         log() << "Times: " << elapsed_seconds0.count() << "s " << elapsed_seconds.count() << "s" << std::endl;
     }
 }
 
 void HttpConnection::check_header_finished() {
+    // TODO: Check empty value headers with RFC
     if (!read_header_.first.empty() && !read_header_.second.empty()) {
         request_->headers_.insert(Header{std::move(read_header_)});
     }
@@ -226,13 +229,13 @@ HttpResponse& HttpResponse::add_header(const String& name, const String& value) 
     return *this;
 }
 
-bool stream2stream(std::stringstream& output, std::stringstream& input) {
+bool stream2stream(std::stringstream&& input, std::stringstream& output) {
     const size_t alloc_block = 256 * 1024;
     char tmp[alloc_block];
     bool written_smth = false;
     while (input) {
         input.read(tmp, sizeof(tmp));
-        size_t size = input.gcount();
+        const auto size = input.gcount();
         output.write(tmp, size);
         if (size) {
             written_smth = true;
@@ -250,8 +253,8 @@ HttpResponse& HttpResponse::body(const String& value) {
     return *this;
 }
 
-HttpResponse& HttpResponse::body(std::stringstream buf) {
-    stream2stream(body_, buf);
+HttpResponse& HttpResponse::body(std::stringstream&& buf) {
+    stream2stream(std::move(buf), body_);
     return *this;
 }
 
@@ -262,7 +265,7 @@ HttpResponse& HttpResponse::body(const void* data, size_t length) {
 
 void HttpResponse::flush() {
     if (!headers_sent_) {
-        if (!stream2stream(full_response_, response_)) {
+        if (!stream2stream(std::move(response_), full_response_)) {
             full_response_ << "HTTP/1.1 200\r\n";
         }
 
@@ -273,13 +276,13 @@ void HttpResponse::flush() {
         body_size_stream << body_size;
         add_header("Content-length", body_size_stream.str());
 
-        stream2stream(full_response_, headers_);
+        stream2stream(std::move(headers_), full_response_);
         headers_sent_ = true;
 
         full_response_ << "\r\n";
     }
 
-    stream2stream(full_response_, body_);
+    stream2stream(std::move(body_), full_response_);
     stream2conn(conn_, full_response_);
 }
 
