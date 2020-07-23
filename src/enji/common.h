@@ -110,8 +110,6 @@ public:
     }
 
     bool pop(T& obj) {
-        if (queue_.empty())
-            return false;
         std::lock_guard<std::mutex> guard{mutex_};
         if (queue_.empty())
             return false;
